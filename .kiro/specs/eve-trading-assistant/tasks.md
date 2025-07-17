@@ -2,7 +2,7 @@
 
 ## Project Setup and Infrastructure
 
-- [-] 1. Initialize project structure and development environment
+- [ ] 1. Initialize project structure and development environment
   - Create root project directory with microservices architecture
   - Set up package.json with TypeScript, Node.js dependencies
   - Configure ESLint, Prettier, and development tooling
