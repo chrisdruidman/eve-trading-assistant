@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Auto Git Commit Backup",
+  "description": "Automatically creates a backup git commit when task status changes to completed, ensuring no work is lost if steering rules miss the commit",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.md",
+      "**/*.json",
+      "**/*.ts",
+      "**/*.js",
+      "**/*.tsx",
+      "**/*.jsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task has been completed. Check if there are uncommitted changes in the git repository and create a backup commit if needed. Use the following commands:\n\n1. Check for uncommitted changes: `git status --porcelain`\n2. If changes exist, stage all files: `git add .`\n3. Create commit with message: \"feat: Task completed - Auto-backup commit\\n\\nBackup commit via Agent Hook\\nManual review recommended\"\n4. Push to current branch: `git push origin $(git branch --show-current)`\n\nOnly perform the git operations if there are actually uncommitted changes to avoid empty commits."
+  }
+}
