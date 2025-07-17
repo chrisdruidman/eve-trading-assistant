@@ -51,14 +51,14 @@
 
 ## Market Data Service
 
-- [-] 7. Build market data service foundation
+- [x] 7. Build market data service foundation
   - Create Fastify server setup with plugins and middleware
   - Implement database models for market data storage
   - Set up Redis connection and caching utilities
   - Create basic API routes structure
   - _Requirements: 9.1, 9.2_
 
-- [ ] 8. Implement EVE Online ESI market data integration
+- [-] 8. Implement EVE Online ESI market data integration
   - Build ESI API client with rate limiting and error handling
   - Create market data fetching for orders and prices
   - Implement historical price data collection

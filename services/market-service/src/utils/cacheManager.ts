@@ -174,19 +174,29 @@ export class CacheManager {
       try {
         const info = await this.fastify.redis.client.info('memory');
         const memoryMatch = info.match(/used_memory_human:(.+)/);
-        if (memoryMatch) {
+        if (memoryMatch && memoryMatch[1]) {
           memoryUsage = memoryMatch[1].trim();
         }
       } catch (error) {
         // Memory info not available
       }
 
-      return {
+      const result: {
+        totalKeys: number;
+        marketDataKeys: number;
+        historicalDataKeys: number;
+        memoryUsage?: string;
+      } = {
         totalKeys: allKeys.length,
         marketDataKeys,
         historicalDataKeys,
-        memoryUsage,
       };
+
+      if (memoryUsage) {
+        result.memoryUsage = memoryUsage;
+      }
+
+      return result;
     } catch (error) {
       this.fastify.log.error({ error }, 'Failed to get cache stats');
       return {
