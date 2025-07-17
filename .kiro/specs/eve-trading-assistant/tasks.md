@@ -34,14 +34,15 @@
   - Implement user session management
   - _Requirements: 6.2, 6.3_
 
-- [ ] 5. Implement EVE Online API key management
+- [x] 5. Implement EVE Online API key management
   - Create secure API key storage with AES-256 encryption
   - Build EVE Online ESI API key validation
   - Implement character information fetching and storage
   - Create API key renewal notification system
+  - Ensure best practices are followed for the EVE Online ESI API - docs found here: [text](https://raw.githubusercontent.com/esi/esi-docs/main/docs/services/esi/best-practices.md)
   - _Requirements: 4.1, 4.2, 4.3, 6.1_
 
-- [ ] 6. Add user management and profile features
+- [-] 6. Complete user management and profile features
   - Implement user profile creation and updates
   - Create user preferences and settings management
   - Build account deletion with GDPR compliance
@@ -50,26 +51,28 @@
 
 ## Market Data Service
 
-- [ ] 7. Build EVE Online ESI integration
-  - Implement ESI API client with rate limiting
+- [ ] 7. Build market data service foundation
+  - Create Fastify server setup with plugins and middleware
+  - Implement database models for market data storage
+  - Set up Redis connection and caching utilities
+  - Create basic API routes structure
+  - _Requirements: 9.1, 9.2_
+
+- [ ] 8. Implement EVE Online ESI market data integration
+  - Build ESI API client with rate limiting and error handling
   - Create market data fetching for orders and prices
-  - Build historical price data collection
-  - Implement exponential backoff and error handling
+  - Implement historical price data collection
+  - Add exponential backoff and circuit breaker patterns
+  - Review and implement EVE Online ESI best practices - docs: https://raw.githubusercontent.com/esi/esi-docs/main/docs/services/esi/best-practices.md
   - _Requirements: 4.2, 9.1, 9.3, 9.6_
 
-- [ ] 8. Implement intelligent caching system
+- [ ] 9. Build intelligent caching and data management
   - Create Redis-based caching for market data with TTL
   - Implement cache invalidation and refresh strategies
   - Build stale data serving with freshness indicators
+  - Add historical price data storage and retrieval
   - Add cache hit/miss monitoring and metrics
-  - _Requirements: 9.1, 9.2, 9.5_
-
-- [ ] 9. Build market data analysis and storage
-  - Implement historical price data storage and retrieval
-  - Create price trend analysis and calculations
-  - Build market volume and volatility metrics
-  - Add data cleanup and archival processes
-  - _Requirements: 2.2, 2.3_
+  - _Requirements: 9.1, 9.2, 9.5, 2.2, 2.3_
 
 ## AI Agent Service
 
