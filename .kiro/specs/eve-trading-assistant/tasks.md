@@ -17,11 +17,12 @@
   - Implement connection management and health checks
   - _Requirements: 6.1, 6.2, 9.1, 9.2_
 
-- [ ] 3. Implement core shared utilities and interfaces
-  - Expand TypeScript interfaces for all data models (User, MarketData, TradingSuggestion, etc.)
-  - Implement encryption utilities for API key storage
-  - Create error handling classes and response formatters
-  - Set up logging and monitoring infrastructure
+- [ ] 3. Complete shared utilities and expand data models
+  - Complete TypeScript interfaces for all data models from design (MarketData, TradingSuggestion, EveCharacter, etc.)
+  - Implement encryption utilities for API key storage using AES-256
+  - Create comprehensive error handling classes and response formatters
+  - Add validation utilities using Zod schemas
+  - Add logging utilities and monitoring infrastructure setup
   - _Requirements: 6.1, 6.2, 6.3_
 
 ## Authentication and Security Service

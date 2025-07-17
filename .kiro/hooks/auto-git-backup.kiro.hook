@@ -1,21 +1,24 @@
 {
   "enabled": true,
-  "name": "Auto Git Commit Backup",
-  "description": "Automatically creates a backup git commit when task status changes to completed, ensuring no work is lost if steering rules miss the commit",
-  "version": "1",
+  "name": "Auto Git Commit on Task Completion",
+  "description": "Automatically creates git commits when tasks are completed or when significant code changes are made, ensuring proper version control throughout development",
+  "version": "2",
   "when": {
     "type": "fileEdited",
     "patterns": [
-      "**/*.md",
-      "**/*.json",
+      "**/tasks.md",
       "**/*.ts",
       "**/*.js",
       "**/*.tsx",
-      "**/*.jsx"
+      "**/*.jsx",
+      "**/*.json",
+      "**/package.json",
+      "**/Dockerfile",
+      "**/*.sql"
     ]
   },
   "then": {
     "type": "askAgent",
-    "prompt": "A task has been completed. Check if there are uncommitted changes in the git repository and create a backup commit if needed. Use the following commands:\n\n1. Check for uncommitted changes: `git status --porcelain`\n2. If changes exist, stage all files: `git add .`\n3. Create commit with message: \"feat: Task completed - Auto-backup commit\\n\\nBackup commit via Agent Hook\\nManual review recommended\"\n4. Push to current branch: `git push origin $(git branch --show-current)`\n\nOnly perform the git operations if there are actually uncommitted changes to avoid empty commits."
+    "prompt": "A file has been modified that may indicate task completion or significant development progress. Please:\n\n1. Check if there are uncommitted changes: `git status --porcelain`\n2. If this appears to be task completion (tasks.md was modified), check what task was completed\n3. If there are uncommitted changes, create an appropriate commit:\n   - For task completion: Use format 'feat: [task-id] - [description]' with details about what was implemented\n   - For code changes: Use format 'feat: [component] - [description]' or 'fix: [component] - [description]'\n   - For infrastructure: Use format 'chore: [description]' for config/setup changes\n\n4. Stage all changes: `git add .`\n5. Commit with descriptive message following the format above\n6. Push to current branch: `git push origin $(git branch --show-current)`\n\nOnly perform git operations if there are actual uncommitted changes. Include relevant details about what was implemented or changed in the commit message."
   }
 }
