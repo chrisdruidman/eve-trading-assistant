@@ -1,0 +1,49 @@
+{
+  "name": "eve-trading-assistant",
+  "version": "1.0.0",
+  "description": "AI-powered trading assistant for EVE Online players",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:services\" \"npm run dev:frontend\"",
+    "dev:services": "concurrently \"npm run dev -w auth-service\" \"npm run dev -w market-service\" \"npm run dev -w trading-service\" \"npm run dev -w ai-service\" \"npm run dev -w notification-service\" \"npm run dev -w user-service\"",
+    "dev:frontend": "npm run dev -w frontend",
+    "build": "npm run build:shared && npm run build:services && npm run build:frontend",
+    "build:shared": "npm run build -w shared",
+    "build:services": "npm run build -w auth-service && npm run build -w market-service && npm run build -w trading-service && npm run build -w ai-service && npm run build -w notification-service && npm run build -w user-service",
+    "build:frontend": "npm run build -w frontend",
+    "test": "npm run test --workspaces",
+    "test:unit": "npm run test:unit --workspaces",
+    "test:integration": "npm run test:integration --workspaces",
+    "test:e2e": "npm run test:e2e -w frontend",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "npm run db:migrate -w auth-service",
+    "db:seed": "npm run db:seed -w auth-service",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
