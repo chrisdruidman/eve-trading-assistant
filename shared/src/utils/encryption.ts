@@ -3,9 +3,10 @@
 
 import crypto from 'crypto';
 
-const ALGORITHM = 'aes-256-cbc';
+const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // 256 bits
 const IV_LENGTH = 16; // 128 bits
+const TAG_LENGTH = 16; // 128 bits
 
 export interface EncryptionResult {
   encrypted: string;
@@ -45,15 +46,15 @@ export function encryptData(data: string, key: string): EncryptionResult {
     // Generate random IV
     const iv = crypto.randomBytes(IV_LENGTH);
 
-    // Create cipher
-    const cipher = crypto.createCipher(ALGORITHM, keyBuffer);
+    // Create cipher with key and IV
+    const cipher = crypto.createCipherGCM(ALGORITHM, keyBuffer, iv);
 
     // Encrypt data
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
 
-    // For GCM mode, we need to get the auth tag
-    const tag = Buffer.alloc(16); // Placeholder for compatibility
+    // Get the authentication tag
+    const tag = cipher.getAuthTag();
 
     return {
       encrypted,
@@ -86,8 +87,11 @@ export function decryptData(input: DecryptionInput, key: string): string {
     const iv = Buffer.from(input.iv, 'hex');
     const tag = Buffer.from(input.tag, 'hex');
 
-    // Create decipher
-    const decipher = crypto.createDecipher(ALGORITHM, keyBuffer);
+    // Create decipher with key and IV
+    const decipher = crypto.createDecipherGCM(ALGORITHM, keyBuffer, iv);
+
+    // Set the authentication tag
+    decipher.setAuthTag(tag);
 
     // Decrypt data
     let decrypted = decipher.update(input.encrypted, 'hex', 'utf8');

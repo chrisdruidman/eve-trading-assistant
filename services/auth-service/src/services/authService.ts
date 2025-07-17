@@ -124,12 +124,36 @@ export class AuthService {
   }
 
   async encryptSensitiveData(data: string): Promise<string> {
-    // For now, using bcrypt for encryption (in production, use proper encryption)
-    return bcrypt.hash(data, this.saltRounds);
+    const { encryptData, generateEncryptionKey } = await import(
+      '../../../../shared/src/utils/encryption'
+    );
+    const encryptionKey = process.env.DATA_ENCRYPTION_KEY || generateEncryptionKey();
+
+    if (!process.env.DATA_ENCRYPTION_KEY) {
+      console.warn(
+        '⚠️  DATA_ENCRYPTION_KEY not set. Using generated key (not recommended for production)'
+      );
+    }
+
+    const result = encryptData(data, encryptionKey);
+    return JSON.stringify(result);
   }
 
   async decryptSensitiveData(encryptedData: string): Promise<string> {
-    // This is a placeholder - in production, implement proper decryption
-    throw new Error('Decryption not implemented - use proper encryption/decryption');
+    const { decryptData } = await import('../../../../shared/src/utils/encryption');
+    const encryptionKey = process.env.DATA_ENCRYPTION_KEY;
+
+    if (!encryptionKey) {
+      throw new Error('DATA_ENCRYPTION_KEY not configured');
+    }
+
+    try {
+      const input = JSON.parse(encryptedData);
+      return decryptData(input, encryptionKey);
+    } catch (error) {
+      throw new Error(
+        `Data decryption failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   }
 }

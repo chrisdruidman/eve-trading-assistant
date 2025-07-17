@@ -3,10 +3,16 @@ import { AuthService } from './services/authService';
 import { TokenService } from './services/tokenService';
 import { SessionService } from './services/sessionService';
 import { UserRepository } from './models/userRepository';
+import { EveCharacterRepository } from './models/eveCharacterRepository';
+import { EveEsiService } from './services/eveEsiService';
+import { EveApiKeyService } from './services/eveApiKeyService';
+import { ApiKeyNotificationService } from './services/apiKeyNotificationService';
 import { AuthController } from './controllers/authController';
+import { EveApiController } from './controllers/eveApiController';
 import securityPlugin from './plugins/security';
 import authPlugin from './plugins/auth';
 import { authRoutes } from './routes/authRoutes';
+import { eveApiRoutes } from './routes/eveApiRoutes';
 
 const fastify = Fastify({
   logger: {
@@ -16,22 +22,50 @@ const fastify = Fastify({
 
 async function start() {
   try {
+    // Initialize repositories
+    const userRepository = new UserRepository();
+    const eveCharacterRepository = new EveCharacterRepository();
+
     // Initialize services
     const tokenService = new TokenService();
-    const userRepository = new UserRepository();
     const sessionService = new SessionService();
     const authService = new AuthService(tokenService, userRepository, sessionService);
+    const eveEsiService = new EveEsiService();
+    const eveApiKeyService = new EveApiKeyService(eveCharacterRepository, eveEsiService);
+    const apiKeyNotificationService = new ApiKeyNotificationService(
+      eveApiKeyService,
+      userRepository
+    );
+
+    // Initialize controllers
     const authController = new AuthController(authService);
+    const eveApiController = new EveApiController(eveApiKeyService, apiKeyNotificationService);
+
+    // Create simple DI container
+    const diContainer = {
+      resolve: (name: string) => {
+        const services: Record<string, any> = {
+          authController,
+          eveApiController,
+          tokenService,
+          authService,
+          eveApiKeyService,
+          apiKeyNotificationService,
+        };
+        return services[name];
+      },
+    };
 
     // Register plugins
     await fastify.register(securityPlugin);
     await fastify.register(authPlugin, { tokenService });
 
-    // Add controller to fastify instance
-    fastify.decorate('authController', authController);
+    // Add DI container to fastify instance
+    fastify.decorate('diContainer', diContainer);
 
     // Register routes
     await fastify.register(authRoutes, { prefix: '/auth' });
+    await fastify.register(eveApiRoutes, { prefix: '/api/v1' });
 
     // Health check endpoint
     fastify.get('/health', async () => {
