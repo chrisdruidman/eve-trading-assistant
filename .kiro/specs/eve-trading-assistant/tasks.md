@@ -17,7 +17,7 @@
   - Implement connection management and health checks
   - _Requirements: 6.1, 6.2, 9.1, 9.2_
 
-- [ ] 3. Complete shared utilities and expand data models
+- [x] 3. Complete shared utilities and expand data models
   - Complete TypeScript interfaces for all data models from design (MarketData, TradingSuggestion, EveCharacter, etc.)
   - Implement encryption utilities for API key storage using AES-256
   - Create comprehensive error handling classes and response formatters
@@ -27,7 +27,7 @@
 
 ## Authentication and Security Service
 
-- [ ] 4. Build authentication service foundation
+- [x] 4. Build authentication service foundation
   - Implement user registration and login endpoints
   - Create JWT token generation and validation
   - Set up password hashing and security middleware
