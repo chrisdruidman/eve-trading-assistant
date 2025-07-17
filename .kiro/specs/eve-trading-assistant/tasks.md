@@ -42,7 +42,7 @@
   - Ensure best practices are followed for the EVE Online ESI API - docs found here: [text](https://raw.githubusercontent.com/esi/esi-docs/main/docs/services/esi/best-practices.md)
   - _Requirements: 4.1, 4.2, 4.3, 6.1_
 
-- [-] 6. Complete user management and profile features
+- [x] 6. Complete user management and profile features
   - Implement user profile creation and updates
   - Create user preferences and settings management
   - Build account deletion with GDPR compliance
