@@ -51,7 +51,7 @@
 
 ## Market Data Service
 
-- [ ] 7. Build market data service foundation
+- [-] 7. Build market data service foundation
   - Create Fastify server setup with plugins and middleware
   - Implement database models for market data storage
   - Set up Redis connection and caching utilities
