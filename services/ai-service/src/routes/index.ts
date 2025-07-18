@@ -33,7 +33,10 @@ export async function registerRoutes(fastify: FastifyInstance) {
         'Real-time provider performance monitoring',
       ],
       endpoints: [
-        'POST /api/v1/analyze/market - Analyze market data',
+        'POST /api/v1/analyze/market - Comprehensive market data analysis',
+        'POST /api/v1/analyze/opportunities - Identify trading opportunities',
+        'POST /api/v1/analyze/profit-risk - Assess profit margins and risks',
+        'POST /api/v1/analyze/trends - Predict market trends',
         'POST /api/v1/analyze/trading-advice - Generate trading advice',
         'POST /api/v1/analyze/explain-strategy - Explain trading strategy',
         'GET /api/v1/health - Service health check',

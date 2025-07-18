@@ -167,6 +167,154 @@ export async function analysisRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Trading opportunities identification endpoint
+  fastify.post<{
+    Body: {
+      marketData: MarketData[];
+      context: AnalysisContext;
+    };
+  }>('/analyze/opportunities', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { marketData, context } = request.body as any;
+
+      if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Market data array is required and cannot be empty',
+        });
+      }
+
+      if (!context || !context.userId || !context.budget) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Analysis context with userId and budget is required',
+        });
+      }
+
+      const opportunities = await aiService.identifyTradingOpportunities(marketData, context);
+
+      return reply.send({
+        success: true,
+        data: opportunities,
+        meta: {
+          processedItems: marketData.length,
+          opportunitiesFound: opportunities.length,
+          timestamp: new Date(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Trading opportunities error:', error);
+
+      return reply.status(500).send({
+        error: 'OPPORTUNITIES_FAILED',
+        message: 'Failed to identify trading opportunities',
+        details: error.message,
+      });
+    }
+  });
+
+  // Profit and risk assessment endpoint
+  fastify.post<{
+    Body: {
+      suggestions: TradingSuggestion[];
+      marketData: MarketData[];
+      context: AnalysisContext;
+    };
+  }>('/analyze/profit-risk', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { suggestions, marketData, context } = request.body as any;
+
+      if (!suggestions || !Array.isArray(suggestions) || suggestions.length === 0) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Trading suggestions array is required and cannot be empty',
+        });
+      }
+
+      if (!marketData || !Array.isArray(marketData)) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Market data array is required',
+        });
+      }
+
+      if (!context || !context.userId) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Analysis context with userId is required',
+        });
+      }
+
+      const assessment = await aiService.assessProfitAndRisk(suggestions, marketData, context);
+
+      return reply.send({
+        success: true,
+        data: assessment,
+        meta: {
+          analyzedSuggestions: suggestions.length,
+          identifiedRisks: assessment.risks.length,
+          timestamp: new Date(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Profit risk assessment error:', error);
+
+      return reply.status(500).send({
+        error: 'ASSESSMENT_FAILED',
+        message: 'Failed to assess profit and risk',
+        details: error.message,
+      });
+    }
+  });
+
+  // Market trend prediction endpoint
+  fastify.post<{
+    Body: {
+      marketData: MarketData[];
+      historicalData?: any[];
+      context: AnalysisContext;
+    };
+  }>('/analyze/trends', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { marketData, historicalData = [], context } = request.body as any;
+
+      if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Market data array is required and cannot be empty',
+        });
+      }
+
+      if (!context || !context.userId) {
+        return reply.status(400).send({
+          error: 'INVALID_REQUEST',
+          message: 'Analysis context with userId is required',
+        });
+      }
+
+      const trends = await aiService.predictMarketTrends(marketData, historicalData, context);
+
+      return reply.send({
+        success: true,
+        data: trends,
+        meta: {
+          analyzedItems: marketData.length,
+          historicalDataPoints: historicalData.length,
+          predictedTrends: trends.length,
+          timestamp: new Date(),
+        },
+      });
+    } catch (error: any) {
+      console.error('Market trend prediction error:', error);
+
+      return reply.status(500).send({
+        error: 'TREND_PREDICTION_FAILED',
+        message: 'Failed to predict market trends',
+        details: error.message,
+      });
+    }
+  });
+
   // Enhanced service health endpoint with detailed performance metrics
   fastify.get('/health/detailed', async (request: FastifyRequest, reply: FastifyReply) => {
     try {

@@ -9,11 +9,15 @@ import {
   TradingSuggestion,
   AIResponse,
   AIOperation,
+  TradingOpportunity,
+  RiskAssessment,
+  MarketTrend,
 } from '../../../../shared/src/types';
 import { AIProviderManagerImpl } from '../providers/manager';
 import { AICacheManager } from '../cache/aiCache';
 import { AnthropicProvider } from '../providers/anthropic';
 import { OpenAIProvider } from '../providers/openai';
+import { MarketAnalysisService } from './marketAnalysisService';
 
 /**
  * Main AI Agent Service
@@ -22,11 +26,13 @@ import { OpenAIProvider } from '../providers/openai';
 export class AIService implements AIAgentService {
   private providerManager: AIProviderManagerImpl;
   private cache: AICacheManager;
+  private marketAnalysisService: MarketAnalysisService;
   private initialized = false;
 
   constructor() {
     this.providerManager = new AIProviderManagerImpl();
     this.cache = new AICacheManager();
+    this.marketAnalysisService = new MarketAnalysisService(this.providerManager, this.cache);
   }
 
   /**
@@ -68,29 +74,49 @@ export class AIService implements AIAgentService {
   }
 
   /**
-   * Analyze market data and provide insights
+   * Analyze market data and provide comprehensive insights
    */
   async analyzeMarketData(
     marketData: MarketData[],
     context: AnalysisContext
   ): Promise<MarketAnalysis> {
     await this.ensureInitialized();
+    return this.marketAnalysisService.analyzeMarketData(marketData, context);
+  }
 
-    const prompt = this.buildMarketAnalysisPrompt(marketData, context);
-    const aiContext = {
-      analysisType: 'market_analysis',
-      marketData: this.summarizeMarketData(marketData),
-      userProfile: {
-        userId: context.userId,
-        riskTolerance: context.riskTolerance,
-        availableBudget: context.budget,
-        preferredMarkets: context.preferredRegions,
-        tradingExperience: 'INTERMEDIATE', // Default, could be enhanced
-      },
-    };
+  /**
+   * Identify trading opportunities with detailed analysis
+   */
+  async identifyTradingOpportunities(
+    marketData: MarketData[],
+    context: AnalysisContext
+  ): Promise<TradingOpportunity[]> {
+    await this.ensureInitialized();
+    return this.marketAnalysisService.identifyTradingOpportunities(marketData, context);
+  }
 
-    const response = await this.executeWithCache(prompt, aiContext);
-    return this.parseMarketAnalysis(response, marketData);
+  /**
+   * Assess profit margins and risks for trading suggestions
+   */
+  async assessProfitAndRisk(
+    suggestions: TradingSuggestion[],
+    marketData: MarketData[],
+    context: AnalysisContext
+  ): Promise<{ suggestions: TradingSuggestion[]; risks: RiskAssessment[] }> {
+    await this.ensureInitialized();
+    return this.marketAnalysisService.assessProfitAndRisk(suggestions, marketData, context);
+  }
+
+  /**
+   * Predict market trends with AI analysis
+   */
+  async predictMarketTrends(
+    marketData: MarketData[],
+    historicalData: any[],
+    context: AnalysisContext
+  ): Promise<MarketTrend[]> {
+    await this.ensureInitialized();
+    return this.marketAnalysisService.predictMarketTrends(marketData, historicalData, context);
   }
 
   /**
