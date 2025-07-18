@@ -1,6 +1,27 @@
 import { FastifyInstance } from 'fastify';
 import { MarketData, CacheStrategy } from '../../../../shared/src/types';
 
+interface CacheMetrics {
+  hits: number;
+  misses: number;
+  staleHits: number;
+  freshHits: number;
+  invalidations: number;
+  errors: number;
+  totalRequests: number;
+  hitRate: number;
+  staleRate: number;
+  lastReset: Date;
+}
+
+interface CacheStats {
+  totalKeys: number;
+  marketDataKeys: number;
+  historicalDataKeys: number;
+  memoryUsage?: string;
+  metrics: CacheMetrics;
+}
+
 export class CacheManager {
   private defaultStrategy: CacheStrategy = {
     ttl: 300, // 5 minutes
@@ -8,7 +29,25 @@ export class CacheManager {
     maxStaleTime: 900, // Serve stale data for up to 15 minutes
   };
 
-  constructor(private fastify: FastifyInstance) {}
+  private metrics: CacheMetrics = {
+    hits: 0,
+    misses: 0,
+    staleHits: 0,
+    freshHits: 0,
+    invalidations: 0,
+    errors: 0,
+    totalRequests: 0,
+    hitRate: 0,
+    staleRate: 0,
+    lastReset: new Date(),
+  };
+
+  constructor(private fastify: FastifyInstance) {
+    // Reset metrics every hour to prevent overflow and provide fresh stats
+    setInterval(() => {
+      this.resetMetrics();
+    }, 3600000); // 1 hour
+  }
 
   private getMarketDataKey(regionId: number, typeId: number): string {
     return `market:${regionId}:${typeId}`;
@@ -41,13 +80,25 @@ export class CacheManager {
     typeId: number
   ): Promise<{ data: MarketData | null; isStale: boolean }> {
     const key = this.getMarketDataKey(regionId, typeId);
+    this.metrics.totalRequests++;
 
     try {
       const result = await this.fastify.redis.getWithFreshness(key);
 
       if (!result.value) {
+        this.metrics.misses++;
+        this.updateMetrics();
         return { data: null, isStale: false };
       }
+
+      // Track cache hit
+      this.metrics.hits++;
+      if (result.isStale) {
+        this.metrics.staleHits++;
+      } else {
+        this.metrics.freshHits++;
+      }
+      this.updateMetrics();
 
       const data = JSON.parse(result.value) as MarketData;
 
@@ -62,6 +113,8 @@ export class CacheManager {
 
       return { data, isStale: result.isStale };
     } catch (error) {
+      this.metrics.errors++;
+      this.updateMetrics();
       this.fastify.log.error({ key, error }, 'Failed to get cached market data');
       return { data: null, isStale: false };
     }
@@ -95,13 +148,25 @@ export class CacheManager {
     days: number
   ): Promise<{ data: any[] | null; isStale: boolean }> {
     const key = this.getHistoricalDataKey(regionId, typeId, days);
+    this.metrics.totalRequests++;
 
     try {
       const result = await this.fastify.redis.getWithFreshness(key);
 
       if (!result.value) {
+        this.metrics.misses++;
+        this.updateMetrics();
         return { data: null, isStale: false };
       }
+
+      // Track cache hit
+      this.metrics.hits++;
+      if (result.isStale) {
+        this.metrics.staleHits++;
+      } else {
+        this.metrics.freshHits++;
+      }
+      this.updateMetrics();
 
       const data = JSON.parse(result.value);
 
@@ -114,6 +179,8 @@ export class CacheManager {
 
       return { data, isStale: result.isStale };
     } catch (error) {
+      this.metrics.errors++;
+      this.updateMetrics();
       this.fastify.log.error({ key, error }, 'Failed to get cached historical data');
       return { data: null, isStale: false };
     }
@@ -124,8 +191,12 @@ export class CacheManager {
 
     try {
       await this.fastify.redis.del(key);
+      this.metrics.invalidations++;
+      this.updateMetrics();
       this.fastify.log.debug({ key }, 'Market data cache invalidated');
     } catch (error) {
+      this.metrics.errors++;
+      this.updateMetrics();
       this.fastify.log.error({ key, error }, 'Failed to invalidate market data cache');
     }
   }
@@ -135,8 +206,12 @@ export class CacheManager {
       const key = this.getHistoricalDataKey(regionId, typeId, days);
       try {
         await this.fastify.redis.del(key);
+        this.metrics.invalidations++;
+        this.updateMetrics();
         this.fastify.log.debug({ key }, 'Historical data cache invalidated');
       } catch (error) {
+        this.metrics.errors++;
+        this.updateMetrics();
         this.fastify.log.error({ key, error }, 'Failed to invalidate historical data cache');
       }
     } else {
@@ -147,23 +222,55 @@ export class CacheManager {
         const keys = await this.fastify.redis.client.keys(pattern);
         if (keys.length > 0) {
           await this.fastify.redis.client.del(keys);
+          this.metrics.invalidations += keys.length;
+          this.updateMetrics();
           this.fastify.log.debug(
             { pattern, count: keys.length },
             'Historical data caches invalidated'
           );
         }
       } catch (error) {
+        this.metrics.errors++;
+        this.updateMetrics();
         this.fastify.log.error({ pattern, error }, 'Failed to invalidate historical data caches');
       }
     }
   }
 
-  async getCacheStats(): Promise<{
-    totalKeys: number;
-    marketDataKeys: number;
-    historicalDataKeys: number;
-    memoryUsage?: string;
-  }> {
+  private updateMetrics(): void {
+    if (this.metrics.totalRequests > 0) {
+      this.metrics.hitRate = (this.metrics.hits / this.metrics.totalRequests) * 100;
+      this.metrics.staleRate = (this.metrics.staleHits / this.metrics.hits) * 100;
+    }
+  }
+
+  private resetMetrics(): void {
+    this.fastify.log.info(
+      {
+        previousMetrics: { ...this.metrics },
+      },
+      'Resetting cache metrics'
+    );
+
+    this.metrics = {
+      hits: 0,
+      misses: 0,
+      staleHits: 0,
+      freshHits: 0,
+      invalidations: 0,
+      errors: 0,
+      totalRequests: 0,
+      hitRate: 0,
+      staleRate: 0,
+      lastReset: new Date(),
+    };
+  }
+
+  getMetrics(): CacheMetrics {
+    return { ...this.metrics };
+  }
+
+  async getCacheStats(): Promise<CacheStats> {
     try {
       const allKeys = await this.fastify.redis.client.keys('*');
       const marketDataKeys = allKeys.filter(key => key.startsWith('market:')).length;
@@ -181,15 +288,11 @@ export class CacheManager {
         // Memory info not available
       }
 
-      const result: {
-        totalKeys: number;
-        marketDataKeys: number;
-        historicalDataKeys: number;
-        memoryUsage?: string;
-      } = {
+      const result: CacheStats = {
         totalKeys: allKeys.length,
         marketDataKeys,
         historicalDataKeys,
+        metrics: this.getMetrics(),
       };
 
       if (memoryUsage) {
@@ -203,7 +306,74 @@ export class CacheManager {
         totalKeys: 0,
         marketDataKeys: 0,
         historicalDataKeys: 0,
+        metrics: this.getMetrics(),
       };
     }
+  }
+
+  async invalidateByPattern(pattern: string): Promise<number> {
+    try {
+      // Use SCAN instead of KEYS for better performance in production
+      const keys = await this.fastify.redis.client.keys(pattern);
+      if (keys.length > 0) {
+        await this.fastify.redis.client.del(keys);
+        this.metrics.invalidations += keys.length;
+        this.updateMetrics();
+        this.fastify.log.debug(
+          { pattern, count: keys.length },
+          'Cache keys invalidated by pattern'
+        );
+        return keys.length;
+      }
+      return 0;
+    } catch (error) {
+      this.metrics.errors++;
+      this.updateMetrics();
+      this.fastify.log.error({ pattern, error }, 'Failed to invalidate cache by pattern');
+      throw error;
+    }
+  }
+
+  async warmupCache(
+    items: Array<{ regionId: number; typeId: number }>,
+    fetchFunction: (regionId: number, typeId: number) => Promise<MarketData>
+  ): Promise<{ warmed: number; failed: number; errors: string[] }> {
+    let warmed = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    this.fastify.log.info({ itemCount: items.length }, 'Starting cache warmup');
+
+    for (const item of items) {
+      try {
+        const data = await fetchFunction(item.regionId, item.typeId);
+        await this.cacheMarketData(item.regionId, item.typeId, data);
+        warmed++;
+
+        // Add small delay to prevent overwhelming the system
+        await this.sleep(50);
+      } catch (error) {
+        failed++;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`${item.regionId}:${item.typeId} - ${errorMessage}`);
+
+        this.fastify.log.warn(
+          {
+            regionId: item.regionId,
+            typeId: item.typeId,
+            error: errorMessage,
+          },
+          'Failed to warm cache for item'
+        );
+      }
+    }
+
+    this.fastify.log.info({ warmed, failed, total: items.length }, 'Completed cache warmup');
+
+    return { warmed, failed, errors };
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

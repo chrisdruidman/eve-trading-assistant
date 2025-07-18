@@ -58,7 +58,7 @@
   - Create basic API routes structure
   - _Requirements: 9.1, 9.2_
 
-- [-] 8. Implement EVE Online ESI market data integration
+- [x] 8. Implement EVE Online ESI market data integration
   - Build ESI API client with rate limiting and error handling
   - Create market data fetching for orders and prices
   - Implement historical price data collection
