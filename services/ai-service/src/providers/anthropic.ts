@@ -11,7 +11,7 @@ export class AnthropicProvider extends BaseAIProvider {
   protected apiKey: string;
   protected override baseUrl?: string;
   private client: Anthropic;
-  private model = 'claude-3-sonnet-20240229';
+  private model = 'claude-sonnet-4-20250514';
 
   constructor(apiKey: string) {
     super();
@@ -31,7 +31,7 @@ export class AnthropicProvider extends BaseAIProvider {
 
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: context.maxTokens || 4000,
+        max_tokens: context.maxTokens || 8000,
         temperature: context.temperature || 0.7,
         system: systemPrompt,
         messages: [
@@ -73,11 +73,11 @@ export class AnthropicProvider extends BaseAIProvider {
 
   /**
    * Estimate cost for Anthropic API call
-   * Based on Claude-3 Sonnet pricing: $3/1M input tokens, $15/1M output tokens
+   * Based on Claude Sonnet 4 pricing: $3/1M input tokens, $15/1M output tokens
    */
   estimateCost(prompt: string): number {
     const inputTokens = this.estimateTokens(prompt);
-    const estimatedOutputTokens = Math.min(inputTokens * 0.5, 4000); // Estimate output as 50% of input, max 4000
+    const estimatedOutputTokens = Math.min(inputTokens * 0.5, 8000); // Estimate output as 50% of input, max 8000 (increased for Sonnet 4)
 
     const inputCost = (inputTokens / 1000000) * 3; // $3 per 1M tokens
     const outputCost = (estimatedOutputTokens / 1000000) * 15; // $15 per 1M tokens

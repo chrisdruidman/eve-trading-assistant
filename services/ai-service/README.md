@@ -16,7 +16,7 @@ AI provider orchestration service for the EVE Trading Assistant. This service pr
 ### Core Components
 
 - **BaseAIProvider**: Abstract base class for all AI providers
-- **AnthropicProvider**: Primary AI provider using Claude-3 Sonnet
+- **AnthropicProvider**: Primary AI provider using Claude Sonnet 4
 - **OpenAIProvider**: Secondary AI provider using GPT-4 Turbo
 - **AIProviderManager**: Handles provider registration, selection, and failover
 - **AICacheManager**: Redis-based caching system for AI responses
@@ -25,9 +25,9 @@ AI provider orchestration service for the EVE Trading Assistant. This service pr
 ### Provider Priority
 
 1. **Anthropic Claude** (Primary)
-   - Model: claude-3-sonnet-20240229
+   - Model: claude-sonnet-4-20250514
    - Pricing: $3/1M input tokens, $15/1M output tokens
-   - Specialized for detailed analysis and reasoning
+   - Features: High-performance reasoning, 200K context, 64K max output, extended thinking
 
 2. **OpenAI GPT** (Fallback)
    - Model: gpt-4-turbo-preview
