@@ -166,4 +166,29 @@ export async function analysisRoutes(fastify: FastifyInstance) {
       });
     }
   });
+
+  // Enhanced service health endpoint with detailed performance metrics
+  fastify.get('/health/detailed', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const enhancedHealth = await aiService.getEnhancedServiceHealth();
+
+      return reply.send({
+        success: true,
+        data: enhancedHealth,
+        meta: {
+          timestamp: new Date(),
+          description:
+            'Enhanced health check with provider performance metrics and failover status',
+        },
+      });
+    } catch (error: any) {
+      console.error('Enhanced health check error:', error);
+
+      return reply.status(500).send({
+        error: 'ENHANCED_HEALTH_CHECK_FAILED',
+        message: 'Failed to get enhanced service health',
+        details: error.message,
+      });
+    }
+  });
 }

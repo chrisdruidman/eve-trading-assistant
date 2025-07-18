@@ -165,6 +165,27 @@ Keep the explanation clear and educational for traders of all experience levels.
   }
 
   /**
+   * Get enhanced service health with detailed performance metrics
+   */
+  async getEnhancedServiceHealth(): Promise<EnhancedServiceHealth> {
+    const providerStats = this.providerManager.getEnhancedProviderStats();
+    const cacheStats = await this.cache.getStats();
+
+    return {
+      initialized: this.initialized,
+      providers: providerStats,
+      cache: cacheStats,
+      timestamp: new Date(),
+      systemMetrics: {
+        totalProviders: providerStats.totalProviders,
+        activeProviders: providerStats.activeProviders,
+        primaryProvider: providerStats.primary,
+        failoverCapable: providerStats.activeProviders > 1,
+      },
+    };
+  }
+
+  /**
    * Execute AI operation with caching
    */
   private async executeWithCache(prompt: string, context: any): Promise<AIResponse> {
@@ -342,4 +363,20 @@ export interface ServiceHealth {
   providers: Record<string, any>;
   cache: any;
   timestamp: Date;
+}
+
+/**
+ * Enhanced service health interface with detailed metrics
+ */
+export interface EnhancedServiceHealth {
+  initialized: boolean;
+  providers: Record<string, any>;
+  cache: any;
+  timestamp: Date;
+  systemMetrics: {
+    totalProviders: number;
+    activeProviders: number;
+    primaryProvider: string | null;
+    failoverCapable: boolean;
+  };
 }

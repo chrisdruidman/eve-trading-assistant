@@ -45,7 +45,7 @@ describe('AnthropicProvider', () => {
       });
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 8000,
         temperature: 0.7,
         system: expect.any(String),
@@ -107,7 +107,7 @@ describe('AnthropicProvider', () => {
       await provider.generateResponse('Test prompt', context);
 
       expect(mockCreate).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 2000,
         temperature: 0.5,
         system: expect.stringContaining('BEGINNER'),

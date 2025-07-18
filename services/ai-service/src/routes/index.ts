@@ -22,13 +22,22 @@ export async function registerRoutes(fastify: FastifyInstance) {
   fastify.get('/info', async (request, reply) => {
     return reply.send({
       service: 'EVE Trading Assistant - AI Service',
-      description: 'AI provider orchestration service for trading analysis',
+      description:
+        'AI provider orchestration service with enhanced failover and performance monitoring',
       version: '1.0.0',
+      features: [
+        'Multi-provider AI failover system',
+        'Performance-based provider selection',
+        'Response format standardization',
+        'Circuit breaker pattern for reliability',
+        'Real-time provider performance monitoring',
+      ],
       endpoints: [
         'POST /api/v1/analyze/market - Analyze market data',
         'POST /api/v1/analyze/trading-advice - Generate trading advice',
         'POST /api/v1/analyze/explain-strategy - Explain trading strategy',
         'GET /api/v1/health - Service health check',
+        'GET /api/v1/health/detailed - Enhanced health check with performance metrics',
         'GET /health - Basic health check',
         'GET /info - Service information',
       ],

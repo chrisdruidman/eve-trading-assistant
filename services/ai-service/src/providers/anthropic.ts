@@ -11,7 +11,7 @@ export class AnthropicProvider extends BaseAIProvider {
   protected apiKey: string;
   protected override baseUrl?: string;
   private client: Anthropic;
-  private model = 'claude-sonnet-4-20250514';
+  private model = 'claude-3-5-sonnet-20241022';
 
   constructor(apiKey: string) {
     super();
