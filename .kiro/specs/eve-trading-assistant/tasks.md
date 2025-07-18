@@ -66,7 +66,7 @@
   - Review and implement EVE Online ESI best practices - docs: https://raw.githubusercontent.com/esi/esi-docs/main/docs/services/esi/best-practices.md
   - _Requirements: 4.2, 9.1, 9.3, 9.6_
 
-- [ ] 9. Build intelligent caching and data management
+- [x] 9. Build intelligent caching and data management
   - Create Redis-based caching for market data with TTL
   - Implement cache invalidation and refresh strategies
   - Build stale data serving with freshness indicators
@@ -76,7 +76,7 @@
 
 ## AI Agent Service
 
-- [ ] 10. Create AI provider abstraction layer
+- [-] 10. Create AI provider abstraction layer
   - Build AI provider interface and plugin system
   - Implement Anthropic API integration as primary provider
   - Create AI response caching and cost optimization
