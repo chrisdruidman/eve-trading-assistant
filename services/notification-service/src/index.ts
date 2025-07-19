@@ -64,7 +64,6 @@ process.on('SIGTERM', async () => {
     await server.close();
     console.log('Notification service shut down gracefully');
   } catch (error) {
-    console.error('Error during shutdown:', error);
     process.exit(1);
   }
 });
