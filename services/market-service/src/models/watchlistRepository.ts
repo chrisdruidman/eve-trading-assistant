@@ -15,9 +15,9 @@ export class WatchlistRepository {
     const row = result.rows[0];
 
     return {
-      id: row.id,
-      userId: row.user_id,
-      name: row.name,
+      id: row['id'],
+      userId: row['user_id'],
+      name: row['name'],
       items: [],
       alerts: [],
     };
@@ -39,9 +39,9 @@ export class WatchlistRepository {
       const alerts = await this.getWatchlistAlerts(row.id);
 
       watchlists.push({
-        id: row.id,
-        userId: row.user_id,
-        name: row.name,
+        id: row['id'],
+        userId: row['user_id'],
+        name: row['name'],
         items,
         alerts,
       });
@@ -67,9 +67,9 @@ export class WatchlistRepository {
     const alerts = await this.getWatchlistAlerts(watchlistId);
 
     return {
-      id: row.id,
-      userId: row.user_id,
-      name: row.name,
+      id: row['id'],
+      userId: row['user_id'],
+      name: row['name'],
       items,
       alerts,
     };
@@ -120,11 +120,11 @@ export class WatchlistRepository {
     const result = await this.db.query(query, [watchlistId]);
 
     return result.rows.map(row => ({
-      typeId: row.type_id,
-      regionId: row.region_id,
-      targetBuyPrice: row.target_buy_price,
-      targetSellPrice: row.target_sell_price,
-      addedAt: row.added_at,
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      targetBuyPrice: row['target_buy_price'],
+      targetSellPrice: row['target_sell_price'],
+      addedAt: row['added_at'],
     }));
   }
 
@@ -150,13 +150,13 @@ export class WatchlistRepository {
     const row = result.rows[0];
 
     return {
-      id: row.id,
-      typeId: row.type_id,
-      regionId: row.region_id,
-      condition: row.condition,
-      threshold: row.threshold,
-      isActive: row.is_active,
-      createdAt: row.created_at,
+      id: row['id'],
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      condition: row['condition'],
+      threshold: row['threshold'],
+      isActive: row['is_active'],
+      createdAt: row['created_at'],
     };
   }
 
@@ -206,13 +206,13 @@ export class WatchlistRepository {
     const result = await this.db.query(query, [watchlistId]);
 
     return result.rows.map(row => ({
-      id: row.id,
-      typeId: row.type_id,
-      regionId: row.region_id,
-      condition: row.condition,
-      threshold: row.threshold,
-      isActive: row.is_active,
-      createdAt: row.created_at,
+      id: row['id'],
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      condition: row['condition'],
+      threshold: row['threshold'],
+      isActive: row['is_active'],
+      createdAt: row['created_at'],
     }));
   }
 
@@ -229,15 +229,15 @@ export class WatchlistRepository {
     const result = await this.db.query(query);
 
     return result.rows.map(row => ({
-      id: row.id,
-      typeId: row.type_id,
-      regionId: row.region_id,
-      condition: row.condition,
-      threshold: row.threshold,
-      isActive: row.is_active,
-      createdAt: row.created_at,
-      watchlistId: row.watchlist_id,
-      userId: row.user_id,
+      id: row['id'],
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      condition: row['condition'],
+      threshold: row['threshold'],
+      isActive: row['is_active'],
+      createdAt: row['created_at'],
+      watchlistId: row['watchlist_id'],
+      userId: row['user_id'],
     }));
   }
 
@@ -259,14 +259,14 @@ export class WatchlistRepository {
     const row = result.rows[0];
 
     return {
-      id: row.id,
-      userId: row.user_id,
-      ruleId: row.rule_id,
-      typeId: row.type_id,
-      regionId: row.region_id,
-      message: row.message,
-      triggeredAt: row.triggered_at,
-      acknowledged: row.acknowledged,
+      id: row['id'],
+      userId: row['user_id'],
+      ruleId: row['rule_id'],
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      message: row['message'],
+      triggeredAt: row['triggered_at'],
+      acknowledged: row['acknowledged'],
     };
   }
 
@@ -282,14 +282,14 @@ export class WatchlistRepository {
     const result = await this.db.query(query, [userId, limit]);
 
     return result.rows.map(row => ({
-      id: row.id,
-      userId: row.user_id,
-      ruleId: row.rule_id,
-      typeId: row.type_id,
-      regionId: row.region_id,
-      message: row.message,
-      triggeredAt: row.triggered_at,
-      acknowledged: row.acknowledged,
+      id: row['id'],
+      userId: row['user_id'],
+      ruleId: row['rule_id'],
+      typeId: row['type_id'],
+      regionId: row['region_id'],
+      message: row['message'],
+      triggeredAt: row['triggered_at'],
+      acknowledged: row['acknowledged'],
     }));
   }
 
