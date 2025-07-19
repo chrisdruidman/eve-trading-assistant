@@ -77,8 +77,9 @@ export async function tradingRoutes(fastify: FastifyInstance) {
             userId: { type: 'string' },
             parameters: {
               type: 'object',
-              required: ['budget', 'riskTolerance'],
+              required: ['name', 'budget', 'riskTolerance'],
               properties: {
+                name: { type: 'string', minLength: 1 },
                 budget: { type: 'number', minimum: 0.01 },
                 riskTolerance: {
                   type: 'string',
@@ -114,6 +115,150 @@ export async function tradingRoutes(fastify: FastifyInstance) {
       },
     },
     controller.createTradingPlan.bind(controller)
+  );
+
+  // Get trading plan by ID
+  fastify.get(
+    '/plans/:planId',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['planId'],
+          properties: {
+            planId: { type: 'string' },
+          },
+        },
+      },
+    },
+    controller.getTradingPlan.bind(controller)
+  );
+
+  // Get all trading plans for a user
+  fastify.get(
+    '/users/:userId/plans',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['userId'],
+          properties: {
+            userId: { type: 'string' },
+          },
+        },
+      },
+    },
+    controller.getUserTradingPlans.bind(controller)
+  );
+
+  // Update trading plan status
+  fastify.put(
+    '/plans/:planId/status',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['planId'],
+          properties: {
+            planId: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: {
+              type: 'string',
+              enum: ['ACTIVE', 'PAUSED', 'COMPLETED', 'CANCELLED'],
+            },
+          },
+        },
+      },
+    },
+    controller.updateTradingPlanStatus.bind(controller)
+  );
+
+  // Update trading plan budget
+  fastify.put(
+    '/plans/:planId/budget',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['planId'],
+          properties: {
+            planId: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['budget'],
+          properties: {
+            budget: { type: 'number', minimum: 0.01 },
+          },
+        },
+      },
+    },
+    controller.updateTradingPlanBudget.bind(controller)
+  );
+
+  // Allocate budget for a suggestion
+  fastify.post(
+    '/plans/:planId/suggestions/:suggestionId/allocate',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['planId', 'suggestionId'],
+          properties: {
+            planId: { type: 'string' },
+            suggestionId: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['amount'],
+          properties: {
+            amount: { type: 'number', minimum: 0.01 },
+          },
+        },
+      },
+    },
+    controller.allocateBudget.bind(controller)
+  );
+
+  // Release budget allocation
+  fastify.delete(
+    '/suggestions/:suggestionId/allocation',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['suggestionId'],
+          properties: {
+            suggestionId: { type: 'string' },
+          },
+        },
+      },
+    },
+    controller.releaseBudget.bind(controller)
+  );
+
+  // Get trading plan metrics
+  fastify.get(
+    '/plans/:planId/metrics',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['planId'],
+          properties: {
+            planId: { type: 'string' },
+          },
+        },
+      },
+    },
+    controller.getTradingPlanMetrics.bind(controller)
   );
 
   // Budget management
@@ -184,6 +329,31 @@ export async function tradingRoutes(fastify: FastifyInstance) {
       },
     },
     controller.trackTradeExecution.bind(controller)
+  );
+
+  // Complete trade execution
+  fastify.put(
+    '/trades/:tradeId/complete',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['tradeId'],
+          properties: {
+            tradeId: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['sellPrice', 'actualProfit'],
+          properties: {
+            sellPrice: { type: 'number', minimum: 0.01 },
+            actualProfit: { type: 'number' },
+          },
+        },
+      },
+    },
+    controller.completeTradeExecution.bind(controller)
   );
 
   // Detailed analysis

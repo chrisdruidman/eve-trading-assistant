@@ -8,12 +8,15 @@ import {
   UserProfile,
 } from '@shared/types';
 import { TradingSuggestionEngine } from './tradingSuggestionEngine';
+import { TradingPlanRepository } from '../models/tradingPlanRepository';
 
 export class TradingService {
   private suggestionEngine: TradingSuggestionEngine;
+  private tradingPlanRepository: TradingPlanRepository;
 
   constructor() {
     this.suggestionEngine = new TradingSuggestionEngine();
+    this.tradingPlanRepository = new TradingPlanRepository();
   }
 
   /**
@@ -55,15 +58,21 @@ export class TradingService {
    */
   async createTradingPlan(
     userId: string,
-    parameters: TradingPlanParams,
+    parameters: TradingPlanParams & { name: string },
     marketData: MarketData[]
   ): Promise<TradingPlan> {
+    // Validate parameters
+    this.validateTradingPlanParams(parameters);
+
+    // Assess risk tolerance and adjust parameters
+    const adjustedParams = this.assessAndAdjustRiskTolerance(parameters);
+
     // Generate suggestions based on parameters
     const context: AnalysisContext = {
       userId,
-      budget: parameters.budget,
-      riskTolerance: parameters.riskTolerance,
-      preferredRegions: parameters.preferredRegions || [10000002],
+      budget: adjustedParams.budget,
+      riskTolerance: adjustedParams.riskTolerance,
+      preferredRegions: adjustedParams.preferredRegions || [10000002],
       timeHorizon: 'MEDIUM',
     };
 
@@ -74,28 +83,25 @@ export class TradingService {
     );
 
     // Apply additional filters from parameters
-    if (parameters.excludedItems && parameters.excludedItems.length > 0) {
-      suggestions = suggestions.filter(s => !parameters.excludedItems!.includes(s.itemId));
+    if (adjustedParams.excludedItems && adjustedParams.excludedItems.length > 0) {
+      suggestions = suggestions.filter(s => !adjustedParams.excludedItems!.includes(s.itemId));
     }
 
-    if (parameters.maxInvestmentPerTrade) {
+    if (adjustedParams.maxInvestmentPerTrade) {
       suggestions = suggestions.filter(
-        s => s.requiredInvestment <= parameters.maxInvestmentPerTrade!
+        s => s.requiredInvestment <= adjustedParams.maxInvestmentPerTrade!
       );
     }
 
     // Optimize suggestion selection for the plan
-    const optimizedSuggestions = this.optimizeTradingPlan(suggestions, parameters);
+    const optimizedSuggestions = this.optimizeTradingPlan(suggestions, adjustedParams);
 
-    const tradingPlan: TradingPlan = {
-      id: this.generatePlanId(),
+    // Create and persist the trading plan
+    const tradingPlan = await this.tradingPlanRepository.createTradingPlan(
       userId,
-      budget: parameters.budget,
-      riskTolerance: parameters.riskTolerance,
-      suggestions: optimizedSuggestions,
-      createdAt: new Date(),
-      status: 'ACTIVE',
-    };
+      adjustedParams,
+      optimizedSuggestions
+    );
 
     return tradingPlan;
   }
@@ -177,25 +183,70 @@ export class TradingService {
   }
 
   /**
+   * Update trading plan budget
+   */
+  async updateTradingPlanBudget(planId: string, newBudget: number): Promise<boolean> {
+    if (newBudget <= 0) {
+      throw new Error('Budget must be greater than 0');
+    }
+
+    return await this.tradingPlanRepository.updateTradingPlanBudget(planId, newBudget);
+  }
+
+  /**
    * Update user budget and recalculate suggestions if needed
    */
-  async updateBudget(_userId: string, _newBudget: number): Promise<void> {
-    // In a real implementation, this would update the database
-    // and potentially recalculate active trading plans
-    // TODO: Implement database update logic
-    // TODO: Recalculate active trading plans if needed
+  async updateBudget(userId: string, newBudget: number): Promise<void> {
+    if (newBudget <= 0) {
+      throw new Error('Budget must be greater than 0');
+    }
+
+    // Get all active trading plans for the user
+    const activePlans = await this.tradingPlanRepository.getTradingPlansByUserId(userId);
+    const activeUserPlans = activePlans.filter(plan => plan.status === 'ACTIVE');
+
+    // Update budget for all active plans (this is a simplified approach)
+    // In a real implementation, you might want to distribute the budget proportionally
+    // or let the user decide how to allocate the new budget
+    for (const plan of activeUserPlans) {
+      if (plan.budget !== newBudget) {
+        await this.updateTradingPlanBudget(plan.id, newBudget);
+      }
+    }
   }
 
   /**
    * Track execution of a trade
    */
-  async trackTradeExecution(_userId: string, _trade: ExecutedTrade): Promise<void> {
-    // In a real implementation, this would:
-    // 1. Store the trade execution in database
-    // 2. Update user's available budget
-    // 3. Track performance metrics
-    // 4. Update trading plan status if applicable
-    // TODO: Implement trade tracking logic
+  async trackTradeExecution(_userId: string, trade: ExecutedTrade): Promise<string> {
+    // Validate trade data
+    if (!trade.itemId || !trade.buyPrice || !trade.quantity) {
+      throw new Error('Invalid trade data: itemId, buyPrice, and quantity are required');
+    }
+
+    if (trade.buyPrice <= 0 || trade.quantity <= 0) {
+      throw new Error('Buy price and quantity must be greater than 0');
+    }
+
+    // Record the trade execution
+    const tradeId = await this.tradingPlanRepository.recordTradeExecution(trade);
+
+    return tradeId;
+  }
+
+  /**
+   * Complete a trade (when item is sold)
+   */
+  async completeTradeExecution(
+    tradeId: string,
+    sellPrice: number,
+    actualProfit: number
+  ): Promise<boolean> {
+    if (sellPrice <= 0) {
+      throw new Error('Sell price must be greater than 0');
+    }
+
+    return await this.tradingPlanRepository.updateTradeCompletion(tradeId, sellPrice, actualProfit);
   }
 
   /**
@@ -253,10 +304,144 @@ export class TradingService {
   }
 
   /**
-   * Generate a unique plan ID
+   * Get trading plan by ID
    */
-  private generatePlanId(): string {
-    return `plan_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+  async getTradingPlan(planId: string): Promise<TradingPlan | null> {
+    return await this.tradingPlanRepository.getTradingPlanById(planId);
+  }
+
+  /**
+   * Get all trading plans for a user
+   */
+  async getUserTradingPlans(userId: string): Promise<TradingPlan[]> {
+    return await this.tradingPlanRepository.getTradingPlansByUserId(userId);
+  }
+
+  /**
+   * Update trading plan status
+   */
+  async updateTradingPlanStatus(
+    planId: string,
+    status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED'
+  ): Promise<boolean> {
+    return await this.tradingPlanRepository.updateTradingPlanStatus(planId, status);
+  }
+
+  /**
+   * Allocate budget for a trading suggestion
+   */
+  async allocateBudgetForSuggestion(
+    planId: string,
+    suggestionId: string,
+    amount: number
+  ): Promise<boolean> {
+    if (amount <= 0) {
+      throw new Error('Allocation amount must be greater than 0');
+    }
+
+    return await this.tradingPlanRepository.allocateBudget(planId, suggestionId, amount);
+  }
+
+  /**
+   * Release allocated budget
+   */
+  async releaseBudgetAllocation(suggestionId: string): Promise<boolean> {
+    return await this.tradingPlanRepository.releaseBudget(suggestionId);
+  }
+
+  /**
+   * Get trading plan performance metrics
+   */
+  async getTradingPlanMetrics(planId: string): Promise<{
+    totalTrades: number;
+    successfulTrades: number;
+    totalProfit: number;
+    totalInvestment: number;
+    successRate: number;
+    averageProfit: number;
+    roi: number;
+  }> {
+    return await this.tradingPlanRepository.getTradingPlanMetrics(planId);
+  }
+
+  /**
+   * Validate trading plan parameters
+   */
+  private validateTradingPlanParams(params: TradingPlanParams & { name: string }): void {
+    if (!params.name || params.name.trim().length === 0) {
+      throw new Error('Trading plan name is required');
+    }
+
+    if (!params.budget || params.budget <= 0) {
+      throw new Error('Budget must be greater than 0');
+    }
+
+    if (
+      !params.riskTolerance ||
+      !['CONSERVATIVE', 'MODERATE', 'AGGRESSIVE'].includes(params.riskTolerance)
+    ) {
+      throw new Error('Valid risk tolerance is required (CONSERVATIVE, MODERATE, or AGGRESSIVE)');
+    }
+
+    if (params.maxInvestmentPerTrade && params.maxInvestmentPerTrade <= 0) {
+      throw new Error('Max investment per trade must be greater than 0 if specified');
+    }
+
+    if (params.maxInvestmentPerTrade && params.maxInvestmentPerTrade > params.budget) {
+      throw new Error('Max investment per trade cannot exceed total budget');
+    }
+  }
+
+  /**
+   * Assess and adjust risk tolerance based on budget and preferences
+   */
+  private assessAndAdjustRiskTolerance(
+    params: TradingPlanParams & { name: string }
+  ): TradingPlanParams & { name: string } {
+    const adjustedParams = { ...params };
+
+    // Adjust max investment per trade based on risk tolerance if not specified
+    if (!adjustedParams.maxInvestmentPerTrade) {
+      switch (adjustedParams.riskTolerance) {
+        case 'CONSERVATIVE':
+          adjustedParams.maxInvestmentPerTrade = adjustedParams.budget * 0.15; // Max 15% per trade
+          break;
+        case 'MODERATE':
+          adjustedParams.maxInvestmentPerTrade = adjustedParams.budget * 0.25; // Max 25% per trade
+          break;
+        case 'AGGRESSIVE':
+          adjustedParams.maxInvestmentPerTrade = adjustedParams.budget * 0.4; // Max 40% per trade
+          break;
+      }
+    }
+
+    // Ensure max investment doesn't exceed risk tolerance limits
+    const maxAllowedByRisk = this.getMaxInvestmentByRiskTolerance(
+      adjustedParams.budget,
+      adjustedParams.riskTolerance
+    );
+
+    if (adjustedParams.maxInvestmentPerTrade! > maxAllowedByRisk) {
+      adjustedParams.maxInvestmentPerTrade = maxAllowedByRisk;
+    }
+
+    return adjustedParams;
+  }
+
+  /**
+   * Get maximum investment per trade based on risk tolerance
+   */
+  private getMaxInvestmentByRiskTolerance(budget: number, riskTolerance: string): number {
+    switch (riskTolerance) {
+      case 'CONSERVATIVE':
+        return budget * 0.2; // Conservative: max 20% per trade
+      case 'MODERATE':
+        return budget * 0.35; // Moderate: max 35% per trade
+      case 'AGGRESSIVE':
+        return budget * 0.5; // Aggressive: max 50% per trade
+      default:
+        return budget * 0.25; // Default to moderate
+    }
   }
 
   /**

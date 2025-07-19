@@ -135,7 +135,8 @@ describe('TradingService', () => {
   });
 
   describe('createTradingPlan', () => {
-    const mockParameters: TradingPlanParams = {
+    const mockParameters: TradingPlanParams & { name: string } = {
+      name: 'Test Plan',
       budget: 100000,
       riskTolerance: 'MODERATE',
       preferredRegions: [10000002],
@@ -174,7 +175,7 @@ describe('TradingService', () => {
     });
 
     it('should exclude specified items', async () => {
-      const parametersWithExclusions: TradingPlanParams = {
+      const parametersWithExclusions: TradingPlanParams & { name: string } = {
         ...mockParameters,
         excludedItems: [34], // Exclude first item
       };

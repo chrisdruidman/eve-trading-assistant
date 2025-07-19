@@ -106,7 +106,7 @@
   - Add profit margin and ROI calculations
   - _Requirements: 1.1, 1.2, 1.3, 3.1_
 
-- [ ] 14. Build trading plan management
+- [-] 14. Build trading plan management
   - Create trading plan creation and optimization
   - Implement budget tracking and allocation
   - Build risk tolerance assessment and application
