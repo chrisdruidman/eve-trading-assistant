@@ -47,13 +47,13 @@ export function encryptData(data: string, key: string): EncryptionResult {
     const iv = crypto.randomBytes(IV_LENGTH);
 
     // Create cipher with key and IV
-    const cipher = crypto.createCipherGCM(ALGORITHM, keyBuffer, iv);
+    const cipher = crypto.createCipher(ALGORITHM, keyBuffer);
 
     // Encrypt data
     let encrypted = cipher.update(data, 'utf8', 'hex');
     encrypted += cipher.final('hex');
 
-    // Get the authentication tag
+    // For GCM mode, we need to get the auth tag
     const tag = cipher.getAuthTag();
 
     return {
@@ -88,7 +88,8 @@ export function decryptData(input: DecryptionInput, key: string): string {
     const tag = Buffer.from(input.tag, 'hex');
 
     // Create decipher with key and IV
-    const decipher = crypto.createDecipherGCM(ALGORITHM, keyBuffer, iv);
+    const decipher = crypto.createDecipher(ALGORITHM, keyBuffer);
+    decipher.setAAD(iv);
 
     // Set the authentication tag
     decipher.setAuthTag(tag);

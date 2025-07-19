@@ -90,7 +90,7 @@
   - Add provider performance monitoring and switching
   - _Requirements: 5.2, 5.4_
 
-- [ ] 12. Build market analysis AI capabilities
+- [x] 12. Build market analysis AI capabilities
   - Create prompts for market data analysis
   - Implement trading opportunity identification
   - Build profit margin and risk assessment AI
@@ -99,7 +99,7 @@
 
 ## Trading Service
 
-- [ ] 13. Implement trading suggestion engine
+- [x] 13. Implement trading suggestion engine
   - Create trading opportunity analysis algorithms
   - Build budget-aware suggestion filtering
   - Implement risk level calculation and categorization
