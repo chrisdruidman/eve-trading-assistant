@@ -8,6 +8,8 @@ import { setupRedis } from './plugins/redis';
 import { setupRoutes } from './routes';
 import { errorHandler } from './plugins/errorHandler';
 import { DataRefreshScheduler } from './services/dataRefreshScheduler';
+import authPlugin from './plugins/auth';
+import watchlistPlugin from './plugins/watchlist';
 
 const fastify = Fastify({
   logger: {
@@ -46,6 +48,12 @@ async function buildApp() {
   // Database and Redis connections
   await fastify.register(setupDatabase);
   await fastify.register(setupRedis);
+
+  // Authentication
+  await fastify.register(authPlugin);
+
+  // Watchlist functionality
+  await fastify.register(watchlistPlugin);
 
   // Error handling
   fastify.setErrorHandler(errorHandler);

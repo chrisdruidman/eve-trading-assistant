@@ -24,7 +24,7 @@ async function runMigrations() {
     const executedMigrations = new Set(executedResult.rows.map(row => row.filename));
 
     // Migration files to run
-    const migrationFiles = ['001_create_market_tables.sql'];
+    const migrationFiles = ['001_create_market_tables.sql', '002_create_watchlist_tables.sql'];
 
     for (const filename of migrationFiles) {
       if (executedMigrations.has(filename)) {

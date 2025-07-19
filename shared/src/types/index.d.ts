@@ -116,7 +116,7 @@ export interface TradingPlan {
     riskTolerance: 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE';
     suggestions: TradingSuggestion[];
     createdAt: Date;
-    status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+    status: 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 }
 export interface TradingPlanParams {
     budget: number;
