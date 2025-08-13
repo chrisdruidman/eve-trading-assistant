@@ -1,0 +1,17 @@
+{
+  "name": "@eve-jita-ai/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo 'frontend build placeholder'",
+    "typecheck": "echo 'no typecheck yet'",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.5"
+  }
+}
+
+
