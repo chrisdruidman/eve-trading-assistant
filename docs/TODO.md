@@ -62,7 +62,7 @@ graph LR
     - **includes**: Client-side table with sorting and filtering; no order placement.
     - **deps**: [T-06]
 
-- [ ] [T-08] Database: Daily Price History Loader
+- [x] [T-08] Database: Daily Price History Loader
     - **goal**: Load `/markets/{region_id}/history/` and maintain `price_history_daily` for The Forge.
     - **includes**: Merge/update strategy keyed by `(region_id, type_id, day)`.
     - **deps**: [T-02]

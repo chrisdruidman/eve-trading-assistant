@@ -13,6 +13,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Agent baseline implemented using Anthropic to produce structured suggestions from aggregated market features. Default model: `claude-sonnet-4-20250514` (override via `ANTHROPIC_MODEL`). [T-05] complete.
 - Backend Suggestion API exposed with endpoints to run a suggestion pass and list suggestions. [T-06] complete.
 - Frontend Suggestions UI to trigger runs and browse suggestions with basic filtering. [T-07] complete.
+- Database price history loader for The Forge with upsert semantics to `price_history_daily` via `/markets/{region_id}/history/`. Programmatic APIs: `fetchForgePriceHistory`, `upsertPriceHistoryRows`, `loadForgePriceHistoryForTypes`. [T-08] complete.
 
 ## Scope and Principles
 
@@ -163,6 +164,17 @@ Environment variables:
 - `SQLITE_DB_PATH`: path to the SQLite DB file (defaults to `packages/backend/dev.sqlite`).
 - `USER_AGENT`: optional override for the ESI User-Agent header.
 - `ANTHROPIC_API_KEY`: required to use the Anthropic-backed agent.
+
+Price history loading (programmatic usage):
+
+```ts
+import { EsiClient, fetchForgePriceHistory, upsertPriceHistoryRows } from '@eve-jita-ai/backend';
+
+const dbPath = 'packages/backend/dev.sqlite';
+const esi = new EsiClient({ dbPath });
+const rows = await fetchForgePriceHistory({ esi, typeId: 34 });
+upsertPriceHistoryRows({ dbPath, regionId: 10000002, typeId: 34, rows });
+```
 
 API Endpoints:
 
