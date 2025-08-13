@@ -1,20 +1,20 @@
 ## EVE Jita AI Trader — Monorepo (Docs-Only Bootstrap)
 
-This repository bootstraps a monorepo for a web app that suggests profitable market orders in EVE Online, focusing initially on the main trade hub (Jita, The Forge). This commit intentionally contains documentation only. No application code exists yet.
+This repository bootstraps a monorepo for a web app that suggests profitable market orders in EVE Online, focusing initially on the main trade hub (Jita, The Forge). The repository now includes monorepo scaffolding and minimal TypeScript packages; core application logic is not implemented yet.
 
 The app will leverage EVE's ESI API with strict adherence to best practices, including proper user agent identification, error-limit handling, and cache-aware data fetching. Refer to the ESI best practices documentation: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
 
 ### Status
 
--   Documentation only. Ready for AI agents to begin implementation in phases.
+- Monorepo scaffolding in place (npm workspaces, TypeScript base config, lint/format, tests, CI). [T-01] complete; ready to start [T-02] (ESI client + cache layer).
 
 ## Scope and Principles
 
--   Suggest market orders within a specified budget to maximize expected profit.
--   Initial scope limited to Jita (system 30000142 in The Forge region 10000002) for simplicity and performance.
--   Read-only interaction with the ESI API; no in-game automation of order placement.
--   SQLite is the initial data store. Future upgrades can introduce alternative databases via adapters.
--   Strict compliance with third-party API etiquette: caching, backoff, and error-limit respect.
+- Suggest market orders within a specified budget to maximize expected profit.
+- Initial scope limited to Jita (system 30000142 in The Forge region 10000002) for simplicity and performance.
+- Read-only interaction with the ESI API; no in-game automation of order placement.
+- SQLite is the initial data store. Future upgrades can introduce alternative databases via adapters.
+- Strict compliance with third-party API etiquette: caching, backoff, and error-limit respect.
 
 ## Monorepo Overview
 
@@ -61,9 +61,9 @@ graph TD
 
 Key points:
 
--   The backend is the sole component that speaks to ESI. It injects the correct user agent headers, handles caching via `ETag`/`If-None-Match`, respects `expires`/`last-modified`, and implements error-limit backoff. See: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
--   The agent consumes normalized market snapshots from SQLite and emits suggested orders with clear justifications and risk flags.
--   The frontend provides exploration and decision support; it does not place orders.
+- The backend is the sole component that speaks to ESI. It injects the correct user agent headers, handles caching via `ETag`/`If-None-Match`, respects `expires`/`last-modified`, and implements error-limit backoff. See: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
+- The agent consumes normalized market snapshots from SQLite and emits suggested orders with clear justifications and risk flags.
+- The frontend provides exploration and decision support; it does not place orders.
 
 ## Data Model (Initial)
 
@@ -128,17 +128,17 @@ erDiagram
 
 ## Compliance and 3rd-Party Etiquette
 
--   Identify the application using a meaningful user agent value including app name, version, and contact (email and/or source URL). If running in a browser, use `X-User-Agent` or a `user_agent` query parameter fallback. Details: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
--   Respect ESI error-limits using `X-ESI-Error-Limit-Remain` and `X-ESI-Error-Limit-Reset`. Back off proactively as thresholds are approached.
--   Be cache-aware: honor `expires` and `last-modified`, use `ETag` and `If-None-Match` to obtain `304` responses when appropriate.
--   For paginated endpoints, ensure `last-modified` is consistent across pages; otherwise, refetch to avoid partial snapshots.
--   Avoid scraping behavior. Fetch only what is needed for Jita-focused analysis, at reasonable intervals.
+- Identify the application using a meaningful user agent value including app name, version, and contact (email and/or source URL). If running in a browser, use `X-User-Agent` or a `user_agent` query parameter fallback. Details: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
+- Respect ESI error-limits using `X-ESI-Error-Limit-Remain` and `X-ESI-Error-Limit-Reset`. Back off proactively as thresholds are approached.
+- Be cache-aware: honor `expires` and `last-modified`, use `ETag` and `If-None-Match` to obtain `304` responses when appropriate.
+- For paginated endpoints, ensure `last-modified` is consistent across pages; otherwise, refetch to avoid partial snapshots.
+- Avoid scraping behavior. Fetch only what is needed for Jita-focused analysis, at reasonable intervals.
 
 ## Next Steps
 
--   Start with `docs/AI_AGENT_GUIDE.md` to align on development practices, ESI integration rules, and data-handling patterns.
--   Use `docs/TODO.md` to pick the next high-impact task with clear dependencies.
+- Start with `docs/AI_AGENT_GUIDE.md` to align on development practices, ESI integration rules, and data-handling patterns.
+- Use `docs/TODO.md` to pick the next high-impact task with clear dependencies.
 
 ## References
 
--   EVE ESI documentation and best practices: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
+- EVE ESI documentation and best practices: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
