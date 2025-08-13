@@ -25,3 +25,5 @@ export interface EsiHttp {
 		options?: { method?: 'GET'; query?: Record<string, string | number | boolean> },
 	): Promise<FetchResult>;
 }
+
+export { fetchForgeJitaOrderSnapshots } from './marketIngestion';

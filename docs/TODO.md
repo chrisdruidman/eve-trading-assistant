@@ -36,7 +36,7 @@ graph LR
     - **deps**: [T-01]
     - **refs**: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 
-- [ ] [T-03] Backend: Market Snapshot Ingestion (The Forge Region)
+- [x] [T-03] Backend: Market Snapshot Ingestion (The Forge Region)
     - **goal**: Fetch region orders for 10000002 and filter Jita system 30000142 data into normalized snapshots.
     - **includes**: Pagination with `page` param, stable `last-modified` across pages; retry on inconsistency.
     - **deps**: [T-02]
