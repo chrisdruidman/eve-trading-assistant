@@ -1,8 +1,53 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { helloBackend } from './index';
+import { EsiClient } from './esiClient';
 
 describe('backend smoke', () => {
 	it('helloBackend returns readiness string', () => {
 		expect(helloBackend()).toBe('backend-ready');
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it('EsiClient caches ETag and treats 304 as cache hit', async () => {
+		const client = new EsiClient({ dbPath: ':memory:' });
+
+		const etag = 'W/"abc123"';
+		const expires = new Date(Date.now() + 60_000).toUTCString();
+		const lastModified = new Date().toUTCString();
+
+		const fetchMock = vi.spyOn(globalThis, 'fetch');
+		// First call: 200 with ETag and body
+		fetchMock.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: {
+					etag,
+					expires,
+					'last-modified': lastModified,
+				},
+			}) as unknown as Response,
+		);
+
+		const first = await client.fetchJson('https://example.com/test');
+		expect(first.status).toBe(200);
+		expect(first.fromCache).toBe(false);
+		expect(first.headers['etag']).toBe(etag);
+
+		// Second call: 304 Not Modified
+		fetchMock.mockResolvedValueOnce(
+			new Response(null, {
+				status: 304,
+				headers: {
+					etag,
+				},
+			}) as unknown as Response,
+		);
+
+		const second = await client.fetchJson('https://example.com/test');
+		expect(second.status).toBe(304);
+		expect(second.fromCache).toBe(true);
 	});
 });

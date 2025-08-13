@@ -6,7 +6,8 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 
 ### Status
 
-- Monorepo scaffolding in place (npm workspaces, TypeScript base config, lint/format, tests, CI). [T-01] complete; ready to start [T-02] (ESI client + cache layer).
+- Monorepo scaffolding in place (npm workspaces, TypeScript base config, lint/format, tests, CI). [T-01] complete.
+- Backend ESI client + SQLite cache layer implemented with User-Agent, ETag/If-None-Match, and retry/backoff; tested. [T-02] complete.
 
 ## Scope and Principles
 

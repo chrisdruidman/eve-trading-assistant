@@ -26,7 +26,7 @@ graph LR
     - **includes**: TypeScript setup, linting/formatting, testing harnesses, shared tsconfig, basic CI.
     - **deps**: none
 
-- [ ] [T-02] Backend: ESI Client and Cache Layer
+- [x] [T-02] Backend: ESI Client and Cache Layer
     - **goal**: Implement a thin ESI client wrapper that enforces best practices.
     - **includes**:
         - Inject `User-Agent` (or `X-User-Agent`/`user_agent`) with app name, version, and contact.
