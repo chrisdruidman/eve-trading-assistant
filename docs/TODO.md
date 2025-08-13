@@ -41,7 +41,7 @@ graph LR
     - **includes**: Pagination with `page` param, stable `last-modified` across pages; retry on inconsistency.
     - **deps**: [T-02]
 
-- [ ] [T-04] Database: Suggestion Schema + Migrations
+- [x] [T-04] Database: Suggestion Schema + Migrations
     - **goal**: Create SQLite tables for `suggestion_run` and `suggested_order`.
     - **includes**: One-way migrations stored in `packages/backend/migrations`.
     - **deps**: [T-01]

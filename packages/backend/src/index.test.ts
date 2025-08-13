@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { helloBackend } from './index';
 import { EsiClient } from './esiClient';
+import { runSqliteMigrations } from './db/migrate';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 describe('backend smoke', () => {
 	it('helloBackend returns readiness string', () => {
@@ -49,5 +52,24 @@ describe('backend smoke', () => {
 		const second = await client.fetchJson('https://example.com/test');
 		expect(second.status).toBe(304);
 		expect(second.fromCache).toBe(true);
+	});
+
+	it('runSqliteMigrations creates required tables', async () => {
+		// Use a temporary on-disk DB to persist within test scope
+		const tmp = `test-db-${Date.now()}.sqlite`;
+		const herePath = fileURLToPath(import.meta.url);
+		const hereDir = path.dirname(herePath);
+		const migrationsDir = path.resolve(hereDir, '../migrations');
+		const result = runSqliteMigrations({
+			dbPath: tmp,
+			migrationsDir,
+		});
+		expect(Array.isArray(result.applied)).toBe(true);
+		// Re-run should be idempotent and apply nothing new
+		const result2 = runSqliteMigrations({
+			dbPath: tmp,
+			migrationsDir,
+		});
+		expect(result2.applied.length).toBe(0);
 	});
 });
