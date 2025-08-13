@@ -11,6 +11,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Backend market snapshot ingestion for The Forge with pagination consistency checks and Jita filtering, exposed via `fetchForgeJitaOrderSnapshots`. [T-03] complete.
 - SQLite migrations added for `suggestion_run` and `suggested_order`, with a migration runner `runSqliteMigrations`. [T-04] complete.
 - Agent baseline implemented using Anthropic to produce structured suggestions from aggregated market features. Default model: `claude-sonnet-4-20250514` (override via `ANTHROPIC_MODEL`). [T-05] complete.
+- Backend Suggestion API exposed with endpoints to run a suggestion pass and list suggestions. [T-06] complete.
 
 ## Scope and Principles
 
@@ -143,6 +144,26 @@ erDiagram
 
 - Start with `docs/AI_AGENT_GUIDE.md` to align on development practices, ESI integration rules, Anthropic usage, and data-handling patterns.
 - Use `docs/TODO.md` to pick the next high-impact task with clear dependencies.
+
+### Backend API (development)
+
+After installing dependencies, you can run the backend API locally:
+
+```bash
+npm run --workspace @eve-jita-ai/backend dev
+```
+
+Environment variables:
+
+- `SQLITE_DB_PATH`: path to the SQLite DB file (defaults to `packages/backend/dev.sqlite`).
+- `USER_AGENT`: optional override for the ESI User-Agent header.
+- `ANTHROPIC_API_KEY`: required to use the Anthropic-backed agent.
+
+Endpoints:
+
+- `POST /api/suggestions/run` — body: `{ "budget": number, "options"?: {...}, "maxPages"?: number }`
+    - Runs a pass: ingests market snapshots for Jita, computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage }`.
+- `GET /api/suggestions?run_id=...&page=1&limit=50` — lists suggestions for a run (or the latest run when `run_id` is omitted), with pagination metadata.
 
 ## References
 

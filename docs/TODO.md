@@ -52,7 +52,7 @@ graph LR
     - **notes**: Server-side only; configure `ANTHROPIC_API_KEY`. Default model `claude-sonnet-4-20250514` (override via `ANTHROPIC_MODEL`). Include SQLite persistence helper. Do not send raw PII; only derived market features.
     - **deps**: [T-03], [T-04]
 
-- [ ] [T-06] Backend: Suggestion API Endpoints
+- [x] [T-06] Backend: Suggestion API Endpoints
     - **goal**: Expose endpoints to run a suggestion pass and to list the latest suggestions by `run_id`.
     - **includes**: Validation for inputs (budget, constraints) and pagination for results.
     - **deps**: [T-05]

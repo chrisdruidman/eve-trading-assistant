@@ -9,11 +9,13 @@
 		"build": "tsc -p tsconfig.json",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"lint": "eslint .",
-		"test": "vitest run"
+		"test": "vitest run",
+		"dev": "tsx src/server.ts"
 	},
 	"dependencies": {
 		"better-sqlite3": "^9.6.0",
-		"zod": "^3.23.8"
+		"zod": "^3.23.8",
+		"@eve-jita-ai/agent": "workspace:*"
 	},
 	"devDependencies": {
 		"tsx": "^4.19.1",
