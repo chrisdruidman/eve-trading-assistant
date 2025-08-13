@@ -10,7 +10,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Backend ESI client + SQLite cache layer implemented with User-Agent, ETag/If-None-Match, and retry/backoff; tested. [T-02] complete.
 - Backend market snapshot ingestion for The Forge with pagination consistency checks and Jita filtering, exposed via `fetchForgeJitaOrderSnapshots`. [T-03] complete.
 - SQLite migrations added for `suggestion_run` and `suggested_order`, with a migration runner `runSqliteMigrations`. [T-04] complete.
-- Agent baseline will leverage Anthropic to produce structured suggestions from aggregated market features. [T-05] planned (Anthropic-powered).
+- Agent baseline will leverage Anthropic to produce structured suggestions from aggregated market features. Default model: `claude-sonnet-4-20250514` (override via `ANTHROPIC_MODEL`). [T-05] planned (Anthropic-powered).
 
 ## Scope and Principles
 
@@ -19,7 +19,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Read-only interaction with the ESI API; no in-game automation of order placement.
 - SQLite is the initial data store. Future upgrades can introduce alternative databases via adapters.
 - Strict compliance with third-party API etiquette: caching, backoff, and error-limit respect.
-- Agent uses Anthropic models server-side only; configure `ANTHROPIC_API_KEY`. Outputs validated against schema before persistence.
+- Agent uses Anthropic models server-side only; configure `ANTHROPIC_API_KEY`. Default model `claude-sonnet-4-20250514`, override via `ANTHROPIC_MODEL`. Outputs validated against schema before persistence.
 
 ## Monorepo Overview
 

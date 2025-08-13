@@ -26,7 +26,7 @@ Key reference: [ESI Best Practices](https://developers.eveonline.com/docs/servic
 
 ### LLM Provider and Usage (Anthropic)
 
-- Provider: Anthropic (Claude family). Start with a cost-effective, capable model; upgrade as needed.
+- Provider: Anthropic (Claude family). Default model: `claude-sonnet-4-20250514`. Override via `ANTHROPIC_MODEL`.
 - Access: Server-side only from `packages/agent` to keep keys secure. Configure via environment variable `ANTHROPIC_API_KEY`.
 - I/O: The Agent prompts Anthropic with summary features derived from snapshots and requests JSON-only structured output for `suggestion_run` and `suggested_order` records.
 - Guardrails:
@@ -34,6 +34,8 @@ Key reference: [ESI Best Practices](https://developers.eveonline.com/docs/servic
     - Determinism: constrain with explicit instructions, JSON schema, and validation; reject/repair malformed outputs.
     - Privacy: do not send secrets or any PII. Only send derived, non-sensitive market features.
     - Rate limits: implement retry with backoff on 429/5xx responses from Anthropic; log usage.
+
+Production note: Prefer explicit snapshot IDs (e.g., `claude-sonnet-4-20250514`) over aliases for stability. Do not reference Opus variants in this project by default.
 
 ## ESI Integration Requirements
 
