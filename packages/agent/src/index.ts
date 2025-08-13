@@ -28,6 +28,9 @@ type AggregatedTypeFeatures = {
 	sell_volume: number;
 	spread: number | null;
 	spread_pct: number | null;
+	// optional risk inputs
+	cv_30d?: number | null;
+	avg_volume_30d?: number | null;
 };
 
 function generateUuid(): string {
@@ -87,12 +90,17 @@ export type ComputeOptions = {
 	temperature?: number; // default 0.1
 	// for testing
 	anthropicClient?: AnthropicClient;
+	// risk controls
+	maxCv30d?: number; // default 1.0 (high volatility filtered)
+	minAvgVolume30d?: number; // default 1000 (liquidity floor)
 };
 
 export type ComputeParams = {
 	snapshots: MarketOrderSnapshot[];
 	budget: number;
 	options?: ComputeOptions;
+	// Optional precomputed risk metrics keyed by type_id
+	riskByType?: Record<number, { cv_30d: number | null; avg_volume_30d: number | null }>;
 };
 
 export type ComputeResult = {
@@ -134,6 +142,8 @@ function buildUserPrompt(
 			| 'minSpreadPct'
 			| 'minVolume'
 			| 'maxSuggestions'
+			| 'maxCv30d'
+			| 'minAvgVolume30d'
 		>
 	>,
 ): string {
@@ -147,6 +157,8 @@ function buildUserPrompt(
 			minSpreadPct: opts.minSpreadPct,
 			minVolume: opts.minVolume,
 			maxSuggestions: opts.maxSuggestions,
+			maxCv30d: opts.maxCv30d,
+			minAvgVolume30d: opts.minAvgVolume30d,
 		},
 		features: features.map((f) => ({
 			type_id: f.type_id,
@@ -156,6 +168,8 @@ function buildUserPrompt(
 			spread_pct: f.spread_pct,
 			sell_volume: f.sell_volume,
 			buy_volume: f.buy_volume,
+			cv_30d: f.cv_30d ?? null,
+			avg_volume_30d: f.avg_volume_30d ?? null,
 		})),
 		required_output_schema: {
 			suggestions: [
@@ -173,6 +187,7 @@ function buildUserPrompt(
 	return [
 		'Generate up to maxSuggestions buy-side opportunities at Jita using conservative assumptions.',
 		'Only include items where spread_pct >= minSpreadPct and sell_volume >= minVolume and best_ask != null and best_bid != null.',
+		'Prefer lower volatility (cv_30d <= maxCv30d) and adequate liquidity (avg_volume_30d >= minAvgVolume30d).',
 		'Prefer diversified picks across types. Respond with JSON object: { "suggestions": [...] } only.',
 		JSON.stringify(payload, null, 2),
 	].join('\n');
@@ -236,6 +251,8 @@ export async function computeAnthropicBaselineSuggestions(
 	const perTypeBudgetCapPct = options.perTypeBudgetCapPct ?? 0.15;
 	const minSpreadPct = options.minSpreadPct ?? 0.05;
 	const maxSuggestions = options.maxSuggestions ?? 25;
+	const maxCv30d = options.maxCv30d ?? 1.0;
+	const minAvgVolume30d = options.minAvgVolume30d ?? 1000;
 
 	const model = options.model ?? process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514';
 	const temperature = options.temperature ?? 0.1;
@@ -247,9 +264,17 @@ export async function computeAnthropicBaselineSuggestions(
 	}
 
 	// Aggregate features and prefilter to reduce token usage
+	const riskByType = params.riskByType ?? {};
 	const features = aggregateFeaturesByType(snapshots)
+		.map((f) => ({
+			...f,
+			cv_30d: riskByType[f.type_id]?.cv_30d ?? null,
+			avg_volume_30d: riskByType[f.type_id]?.avg_volume_30d ?? null,
+		}))
 		.filter((f) => f.best_ask != null && f.best_bid != null)
 		.filter((f) => (f.spread_pct ?? 0) >= minSpreadPct && f.sell_volume >= minVolume)
+		.filter((f) => f.cv_30d == null || f.cv_30d <= maxCv30d)
+		.filter((f) => f.avg_volume_30d == null || f.avg_volume_30d >= minAvgVolume30d)
 		.sort((a, b) => (b.spread_pct ?? 0) - (a.spread_pct ?? 0))
 		.slice(0, Math.max(maxSuggestions * 4, 50));
 
@@ -262,6 +287,8 @@ export async function computeAnthropicBaselineSuggestions(
 		minSpreadPct,
 		minVolume,
 		maxSuggestions,
+		maxCv30d,
+		minAvgVolume30d,
 	});
 
 	const client =

@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { EsiClient } from './esiClient';
 import { fetchForgeJitaOrderSnapshots } from './marketIngestion';
+import { selectRiskMetricsByType } from './priceHistory';
 import { runSqliteMigrations } from './db/migrate';
 import {
 	computeAnthropicBaselineSuggestions,
@@ -90,10 +91,13 @@ async function handleRunSuggestion(
 		const esi = new EsiClient({ dbPath, userAgent: config.userAgent });
 		const { snapshots } = await fetchForgeJitaOrderSnapshots({ esi, maxPages });
 
+		const typeIds = Array.from(new Set(snapshots.map((s) => s.type_id)));
+		const riskByType = selectRiskMetricsByType({ dbPath, typeIds });
 		const { run, suggestions, usage } = await computeAnthropicBaselineSuggestions({
 			snapshots,
 			budget,
 			options,
+			riskByType,
 		});
 		persistSuggestionsToSqlite(dbPath, run, suggestions);
 		json(res, 200, {

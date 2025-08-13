@@ -1,2 +1,5 @@
 export const placeholder = 'frontend-ready';
-export * from './main';
+// Export types/helpers without running DOM code under test environment
+if (typeof window !== 'undefined') {
+	await import('./main');
+}

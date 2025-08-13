@@ -36,6 +36,19 @@ export function upsertPriceHistoryRows(params: {
 	const db = new DatabaseConstructor(dbPath);
 	try {
 		db.pragma('foreign_keys = ON');
+		// Ensure table exists for unit tests or first-run usage
+		db.exec(
+			`CREATE TABLE IF NOT EXISTS price_history_daily (
+        region_id INTEGER NOT NULL,
+        type_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        avg_price REAL NOT NULL,
+        volume INTEGER NOT NULL,
+        PRIMARY KEY (region_id, type_id, day)
+      );
+      CREATE INDEX IF NOT EXISTS idx_price_history_daily_type_day
+        ON price_history_daily(type_id, day);`,
+		);
 		const stmt = db.prepare(
 			`INSERT INTO price_history_daily (region_id, type_id, day, avg_price, volume)
              VALUES (?, ?, ?, ?, ?)
@@ -70,4 +83,60 @@ export async function loadForgePriceHistoryForTypes(params: {
 		processed += 1;
 	}
 	return { processed };
+}
+
+export type RiskMetrics = {
+	readonly cv_30d: number | null; // coefficient of variation over last 30 days
+	readonly avg_volume_30d: number | null; // average daily volume over last 30 days
+};
+
+export function selectRiskMetricsByType(params: {
+	dbPath: string;
+	regionId?: number; // default The Forge
+	typeIds: number[];
+}): Record<number, RiskMetrics> {
+	const regionId = params.regionId ?? THE_FORGE_REGION_ID;
+	const db = new DatabaseConstructor(params.dbPath, { readonly: true });
+	try {
+		const select = db.prepare(
+			`SELECT day, avg_price, volume
+       FROM price_history_daily
+       WHERE region_id = ? AND type_id = ?
+       ORDER BY day DESC
+       LIMIT 30`,
+		);
+		const result: Record<number, RiskMetrics> = {};
+		for (const typeId of params.typeIds) {
+			const rows = select.all(regionId, typeId) as {
+				day: string;
+				avg_price: number;
+				volume: number;
+			}[];
+			if (!rows.length) {
+				result[typeId] = { cv_30d: null, avg_volume_30d: null };
+				continue;
+			}
+			const prices = rows.map((r) => Number(r.avg_price)).filter((v) => Number.isFinite(v));
+			const volumes = rows.map((r) => Number(r.volume)).filter((v) => Number.isFinite(v));
+			let cv: number | null = null;
+			if (prices.length >= 2) {
+				const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
+				if (mean > 0) {
+					const variance =
+						prices.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) /
+						(prices.length - 1);
+					const stddev = Math.sqrt(variance);
+					cv = stddev / mean;
+				} else {
+					cv = null;
+				}
+			}
+			const avgVol =
+				volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : null;
+			result[typeId] = { cv_30d: cv, avg_volume_30d: avgVol };
+		}
+		return result;
+	} finally {
+		db.close();
+	}
 }

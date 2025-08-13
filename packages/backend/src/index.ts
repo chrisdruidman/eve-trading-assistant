@@ -33,4 +33,5 @@ export {
 	fetchForgePriceHistory,
 	upsertPriceHistoryRows,
 	loadForgePriceHistoryForTypes,
+	selectRiskMetricsByType,
 } from './priceHistory';

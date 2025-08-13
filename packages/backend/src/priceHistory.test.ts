@@ -39,20 +39,7 @@ describe('price history loader', () => {
 	});
 
 	it('upserts rows keyed by (region_id, type_id, day)', () => {
-		const dbPath = ':memory:';
-		const db = new DatabaseConstructor(dbPath);
-		try {
-			db.exec(`CREATE TABLE price_history_daily (
-                region_id INTEGER NOT NULL,
-                type_id INTEGER NOT NULL,
-                day TEXT NOT NULL,
-                avg_price REAL NOT NULL,
-                volume INTEGER NOT NULL,
-                PRIMARY KEY (region_id, type_id, day)
-            );`);
-		} finally {
-			db.close();
-		}
+		const dbPath = `test-db-${Date.now()}.sqlite`;
 		const res1 = upsertPriceHistoryRows({
 			dbPath,
 			regionId: 10000002,

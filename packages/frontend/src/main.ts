@@ -1,71 +1,75 @@
 type SuggestionRun = {
-\trun_id: string;
-\tstarted_at: string;
-\tfinished_at: string | null;
-\tstrategy: string;
-\tbudget: number;
+	run_id: string;
+	started_at: string;
+	finished_at: string | null;
+	strategy: string;
+	budget: number;
 };
 
 type SuggestedOrder = {
-\tsuggestion_id: string;
-\trun_id: string;
-\ttype_id: number;
-\tside: 'buy' | 'sell';
-\tquantity: number;
-\tunit_price: number;
-\texpected_margin: number;
-\trationale: string;
+	suggestion_id: string;
+	run_id: string;
+	type_id: number;
+	side: 'buy' | 'sell';
+	quantity: number;
+	unit_price: number;
+	expected_margin: number;
+	rationale: string;
 };
 
 type ListResponse = {
-\trun: SuggestionRun;
-\tsuggestions: SuggestedOrder[];
-\tpage: number;
-\tlimit: number;
-\ttotal: number;
-\thasMore: boolean;
+	run: SuggestionRun;
+	suggestions: SuggestedOrder[];
+	page: number;
+	limit: number;
+	total: number;
+	hasMore: boolean;
 };
 
 async function apiRunSuggestions(budget: number): Promise<Response> {
-\treturn fetch('/api/suggestions/run', {
-\t\tmethod: 'POST',
-\t\theaders: { 'content-type': 'application/json' },
-\t\tbody: JSON.stringify({ budget }),
-\t});
+	return fetch('/api/suggestions/run', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({ budget }),
+	});
 }
 
 async function apiListSuggestions(params?: {
-\trun_id?: string;
-\tpage?: number;
-\tlimit?: number;
+	run_id?: string;
+	page?: number;
+	limit?: number;
 }): Promise<ListResponse> {
-\tconst url = new URL('/api/suggestions', window.location.origin);
-\tif (params?.run_id) url.searchParams.set('run_id', params.run_id);
-\tif (params?.page) url.searchParams.set('page', String(params.page));
-\tif (params?.limit) url.searchParams.set('limit', String(params.limit));
-\tconst res = await fetch(url);
-\tif (!res.ok) {
-\t\tconst text = await res.text();
-\t\tthrow new Error(`Failed to fetch suggestions: ${res.status} ${text}`);
-\t}
-\treturn (await res.json()) as ListResponse;
+	const url = new URL('/api/suggestions', window.location.origin);
+	if (params?.run_id) url.searchParams.set('run_id', params.run_id);
+	if (params?.page) url.searchParams.set('page', String(params.page));
+	if (params?.limit) url.searchParams.set('limit', String(params.limit));
+	const res = await fetch(url);
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`Failed to fetch suggestions: ${res.status} ${text}`);
+	}
+	return (await res.json()) as ListResponse;
 }
 
 function formatCurrency(value: number): string {
-\treturn new Intl.NumberFormat(undefined, { style: 'currency', currency: 'ISK', currencyDisplay: 'code' }).format(value);
+	return new Intl.NumberFormat(undefined, {
+		style: 'currency',
+		currency: 'ISK',
+		currencyDisplay: 'code',
+	}).format(value);
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
-\ttag: K,
-\tprops?: Record<string, any>,
-\t...children: Array<Node | string>
+	tag: K,
+	props?: Record<string, any>,
+	...children: Array<Node | string>
 ): HTMLElementTagNameMap[K] {
-\tconst node = document.createElement(tag);
-\tif (props) Object.assign(node, props);
-\tfor (const child of children) {
-\t\tnode.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
-\t}
-\treturn node;
+	const node = document.createElement(tag);
+	if (props) Object.assign(node, props);
+	for (const child of children) {
+		node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+	}
+	return node;
 }
 
 function renderSuggestions(container: HTMLElement, data: ListResponse): void {
@@ -83,9 +87,15 @@ function renderSuggestions(container: HTMLElement, data: ListResponse): void {
 	}
 	rows.sort((a, b) => b.expected_margin - a.expected_margin);
 
-	const table = el('table', { className: 'table' },
-		el('thead', {},
-			el('tr', {},
+	const table = el(
+		'table',
+		{ className: 'table' },
+		el(
+			'thead',
+			{},
+			el(
+				'tr',
+				{},
 				el('th', {}, 'Type ID'),
 				el('th', {}, 'Side'),
 				el('th', {}, 'Qty'),
@@ -94,9 +104,13 @@ function renderSuggestions(container: HTMLElement, data: ListResponse): void {
 				el('th', {}, 'Rationale'),
 			),
 		),
-		el('tbody', {},
+		el(
+			'tbody',
+			{},
 			...rows.map((s) =>
-				el('tr', {},
+				el(
+					'tr',
+					{},
 					el('td', {}, String(s.type_id)),
 					el('td', {}, s.side),
 					el('td', {}, String(s.quantity)),
@@ -108,7 +122,9 @@ function renderSuggestions(container: HTMLElement, data: ListResponse): void {
 		),
 	);
 
-	const info = el('div', { className: 'run-info' },
+	const info = el(
+		'div',
+		{ className: 'run-info' },
 		`Run ${data.run.run_id} • Strategy: ${data.run.strategy} • Budget: ${formatCurrency(
 			data.run.budget,
 		)} • ${data.total} suggestions`,
@@ -127,47 +143,49 @@ function renderSuggestions(container: HTMLElement, data: ListResponse): void {
 }
 
 async function refresh(opts?: { run_id?: string; page?: number; limit?: number }): Promise<void> {
-\tconst suggestionsEl = document.getElementById('suggestions')!;
-\tsuggestionsEl.textContent = 'Loading...';
-\ttry {
-\t\tconst data = await apiListSuggestions({ run_id: opts?.run_id, page: opts?.page, limit: opts?.limit });
-\t\trenderSuggestions(suggestionsEl, data);
-\t} catch (err: any) {
-\t\tsuggestionsEl.textContent = String(err?.message ?? err);
-\t}
+	const suggestionsEl = document.getElementById('suggestions')!;
+	suggestionsEl.textContent = 'Loading...';
+	try {
+		const data = await apiListSuggestions({
+			run_id: opts?.run_id,
+			page: opts?.page,
+			limit: opts?.limit,
+		});
+		renderSuggestions(suggestionsEl, data);
+	} catch (err: any) {
+		suggestionsEl.textContent = String(err?.message ?? err);
+	}
 }
 
 function mount(): void {
-\tconst form = document.getElementById('run-form') as HTMLFormElement;
-\tconst budgetInput = document.getElementById('budget') as HTMLInputElement;
-\tconst runBtn = document.getElementById('run-btn') as HTMLButtonElement;
-\tconst statusEl = document.getElementById('status') as HTMLDivElement;
+	const form = document.getElementById('run-form') as HTMLFormElement;
+	const budgetInput = document.getElementById('budget') as HTMLInputElement;
+	const runBtn = document.getElementById('run-btn') as HTMLButtonElement;
+	const statusEl = document.getElementById('status') as HTMLDivElement;
 
-\tform.addEventListener('submit', async (e) => {
-\t\te.preventDefault();
-\t\tconst budget = Number(budgetInput.value);
-\t\tif (!Number.isFinite(budget) || budget <= 0) {
-\t\t\tstatusEl.textContent = 'Enter a positive budget.';
-\t\t\treturn;
-\t\t}
-\t\trunBtn.disabled = true;
-\t\tstatusEl.textContent = 'Running... This may take a moment.';
-\t\ttry {
-\t\t\tconst res = await apiRunSuggestions(budget);
-\t\t\tif (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-\t\t\tstatusEl.textContent = 'Run complete.';
-\t\t\tawait refresh();
-\t\t} catch (err: any) {
-\t\t\tstatusEl.textContent = `Run failed: ${String(err?.message ?? err)}`;
-\t\t} finally {
-\t\t\trunBtn.disabled = false;
-\t\t}
-\t});
+	form.addEventListener('submit', async (e) => {
+		e.preventDefault();
+		const budget = Number(budgetInput.value);
+		if (!Number.isFinite(budget) || budget <= 0) {
+			statusEl.textContent = 'Enter a positive budget.';
+			return;
+		}
+		runBtn.disabled = true;
+		statusEl.textContent = 'Running... This may take a moment.';
+		try {
+			const res = await apiRunSuggestions(budget);
+			if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+			statusEl.textContent = 'Run complete.';
+			await refresh();
+		} catch (err: any) {
+			statusEl.textContent = `Run failed: ${String(err?.message ?? err)}`;
+		} finally {
+			runBtn.disabled = false;
+		}
+	});
 
-\t// Initial load of latest suggestions (if any)
-\trefresh().catch(() => void 0);
+	// Initial load of latest suggestions (if any)
+	refresh().catch(() => void 0);
 }
 
 window.addEventListener('DOMContentLoaded', mount);
-
-

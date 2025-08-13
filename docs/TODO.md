@@ -67,8 +67,9 @@ graph LR
     - **includes**: Merge/update strategy keyed by `(region_id, type_id, day)`.
     - **deps**: [T-02]
 
-- [ ] [T-09] Agent: Risk/Volatility Features
-    - **goal**: Incorporate volatility and liquidity metrics from price history to refine suggestions.
+- [x] [T-09] Agent: Risk/Volatility Features
+    - **goal**: Incorporate volatility (cv_30d) and liquidity (avg_volume_30d) metrics from price history to refine suggestions.
+    - **includes**: Backend selector `selectRiskMetricsByType`, prompt features and filtering in agent (`maxCv30d`, `minAvgVolume30d`), server wiring to pass metrics.
     - **deps**: [T-08], [T-05]
 
 - [ ] [T-10] Agent: Budget + Position Sizing
