@@ -15,6 +15,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Frontend Suggestions UI to trigger runs and browse suggestions with basic filtering. [T-07] complete.
 - Database price history loader for The Forge with upsert semantics to `price_history_daily` via `/markets/{region_id}/history/`. Programmatic APIs: `fetchForgePriceHistory`, `upsertPriceHistoryRows`, `loadForgePriceHistoryForTypes`. [T-08] complete.
 - Agent risk/volatility features: compute 30d coefficient of variation and average volume from `price_history_daily`; filter and enrich features for the LLM. Backend exposes `selectRiskMetricsByType` and server passes `riskByType` to the agent. New agent options: `maxCv30d`, `minAvgVolume30d`. [T-09] complete.
+- Agent budget and position sizing: greedy allocation with per-type budget caps and diversification; respects total budget and caps during suggestion finalization. [T-10] complete.
 
 ## Scope and Principles
 

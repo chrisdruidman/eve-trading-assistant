@@ -313,25 +313,60 @@ export async function computeAnthropicBaselineSuggestions(
 	const startedAt = new Date().toISOString();
 	const strategy = 'anthropic:baseline:v1';
 
+	// Position sizing with diversification and per-type caps
+	// 1) Score suggestions by estimated unit profit (conservative) to allocate capital greedily
+	const effectiveFees = brokerFee + salesTax + otherFeesBuffer;
+	const featureByType: Map<number, AggregatedTypeFeatures> = new Map(
+		features.map((f) => [f.type_id, f]),
+	);
+
+	type Candidate = (typeof validated.data.suggestions)[number] & {
+		unit_profit: number; // estimated conservative unit profit
+	};
+
+	const candidates: Candidate[] = validated.data.suggestions
+		.map((s) => {
+			const f = featureByType.get(s.type_id);
+			const bestBid = f?.best_bid ?? null;
+			const conservativeUnitProfit =
+				bestBid == null
+					? 0
+					: Math.max(0, bestBid - s.unit_price) - s.unit_price * effectiveFees;
+			return {
+				...s,
+				unit_profit: Number.isFinite(conservativeUnitProfit) ? conservativeUnitProfit : 0,
+			};
+		})
+		// Only keep buy-side suggestions with non-negative unit price
+		.filter((s) => s.side === 'buy' && s.unit_price > 0)
+		// Prefer higher unit profit per ISK
+		.sort((a, b) => b.unit_profit - a.unit_profit);
+
 	const suggestions: SuggestedOrder[] = [];
 	const perTypeCap = budget * perTypeBudgetCapPct;
-	for (const s of validated.data.suggestions.slice(0, maxSuggestions)) {
+	const spentPerType: Map<number, number> = new Map();
+	let budgetRemaining = budget;
+
+	for (const s of candidates) {
+		if (suggestions.length >= maxSuggestions) break;
+		if (budgetRemaining <= 0) break;
+
+		const alreadySpentForType = spentPerType.get(s.type_id) ?? 0;
+		const typeCapRemaining = Math.max(0, perTypeCap - alreadySpentForType);
+		const allocationCap = Math.min(budgetRemaining, typeCapRemaining);
+		if (allocationCap <= 0) continue;
+
 		const unitPrice = s.unit_price;
-		const maxAffordableQty =
-			unitPrice > 0 ? Math.floor(Math.min(perTypeCap, budget) / unitPrice) : 0;
-		const quantity = Math.max(0, Math.min(s.quantity, maxAffordableQty));
+		const affordableQty = Math.floor(allocationCap / unitPrice);
+		const quantity = Math.max(0, Math.min(s.quantity, affordableQty));
 		if (quantity <= 0) continue;
 
-		const effectiveFees = brokerFee + salesTax + otherFeesBuffer;
-		const expectedMargin =
-			typeof s.expected_margin === 'number'
-				? s.expected_margin
-				: Math.max(
-						0,
-						(features.find((f) => f.type_id === s.type_id)?.best_bid ?? 0) - unitPrice,
-					) *
-						quantity -
-					unitPrice * quantity * effectiveFees;
+		const expectedUnitProfit = s.unit_profit;
+		const expected_margin = expectedUnitProfit * quantity;
+
+		const spend = unitPrice * quantity;
+		budgetRemaining -= spend;
+		spentPerType.set(s.type_id, alreadySpentForType + spend);
 
 		suggestions.push({
 			suggestion_id: generateUuid(),
@@ -340,7 +375,7 @@ export async function computeAnthropicBaselineSuggestions(
 			side: s.side,
 			quantity,
 			unit_price: unitPrice,
-			expected_margin: expectedMargin,
+			expected_margin,
 			rationale: s.rationale,
 		});
 	}

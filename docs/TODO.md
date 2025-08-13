@@ -72,7 +72,7 @@ graph LR
     - **includes**: Backend selector `selectRiskMetricsByType`, prompt features and filtering in agent (`maxCv30d`, `minAvgVolume30d`), server wiring to pass metrics.
     - **deps**: [T-08], [T-05]
 
-- [ ] [T-10] Agent: Budget + Position Sizing
+- [x] [T-10] Agent: Budget + Position Sizing
     - **goal**: Allocate budget across suggestions with diversification and per-type caps.
     - **deps**: [T-05]
 

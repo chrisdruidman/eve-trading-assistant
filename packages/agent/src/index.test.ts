@@ -67,6 +67,111 @@ describe('computeAnthropicBaselineSuggestions', () => {
 		expect(suggestions[0].quantity).toBeGreaterThan(0);
 		expect(usage.inputTokens).toBe(1);
 	});
+
+	it('allocates within total budget and per-type caps across multiple types', async () => {
+		const snapshots: MarketOrderSnapshot[] = [
+			// Type 34 order book
+			{
+				snapshot_id: 's',
+				region_id: 10000002,
+				system_id: 30000142,
+				type_id: 34,
+				side: 'buy',
+				price: 6,
+				volume: 5000,
+				issued_at: new Date().toISOString(),
+				snapshot_ts: new Date().toISOString(),
+			},
+			{
+				snapshot_id: 's',
+				region_id: 10000002,
+				system_id: 30000142,
+				type_id: 34,
+				side: 'sell',
+				price: 7,
+				volume: 5000,
+				issued_at: new Date().toISOString(),
+				snapshot_ts: new Date().toISOString(),
+			},
+			// Type 35 order book
+			{
+				snapshot_id: 's',
+				region_id: 10000002,
+				system_id: 30000142,
+				type_id: 35,
+				side: 'buy',
+				price: 11,
+				volume: 5000,
+				issued_at: new Date().toISOString(),
+				snapshot_ts: new Date().toISOString(),
+			},
+			{
+				snapshot_id: 's',
+				region_id: 10000002,
+				system_id: 30000142,
+				type_id: 35,
+				side: 'sell',
+				price: 12,
+				volume: 5000,
+				issued_at: new Date().toISOString(),
+				snapshot_ts: new Date().toISOString(),
+			},
+		];
+
+		class MultiMockAnthropicClient {
+			async completeJSON() {
+				const payload = {
+					suggestions: [
+						{
+							type_id: 34,
+							side: 'buy',
+							unit_price: 7,
+							quantity: 10_000,
+							rationale: 't34',
+						},
+						{
+							type_id: 35,
+							side: 'buy',
+							unit_price: 12,
+							quantity: 10_000,
+							rationale: 't35',
+						},
+					],
+				};
+				return { text: JSON.stringify(payload), inputTokens: 2, outputTokens: 2 };
+			}
+		}
+
+		const budget = 1000; // ISK units
+		const perTypeCapPct = 0.15; // 15%
+		const perTypeCap = budget * perTypeCapPct;
+
+		const { suggestions } = await computeAnthropicBaselineSuggestions({
+			snapshots,
+			budget,
+			options: {
+				anthropicClient: new MultiMockAnthropicClient() as any,
+				perTypeBudgetCapPct: perTypeCapPct,
+				maxSuggestions: 10,
+			},
+		});
+
+		const spendByType = new Map<number, number>();
+		let totalSpend = 0;
+		for (const s of suggestions) {
+			const spend = s.unit_price * s.quantity;
+			totalSpend += spend;
+			spendByType.set(s.type_id, (spendByType.get(s.type_id) ?? 0) + spend);
+		}
+
+		expect(totalSpend).toBeLessThanOrEqual(budget + 1e-6);
+		for (const spend of spendByType.values()) {
+			expect(spend).toBeLessThanOrEqual(perTypeCap + 1e-6);
+		}
+		// Should allocate some non-zero quantity across types (diversification via caps)
+		expect(suggestions.some((s) => s.type_id === 34 && s.quantity > 0)).toBe(true);
+		expect(suggestions.some((s) => s.type_id === 35 && s.quantity > 0)).toBe(true);
+	});
 });
 
 describe('persistSuggestionsToSqlite', () => {
