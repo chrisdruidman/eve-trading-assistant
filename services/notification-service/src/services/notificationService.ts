@@ -1,5 +1,9 @@
 import { RedisClientType } from 'redis';
-import { Notification, NotificationChannel, NotificationPreferences } from '../../../shared/src/types';
+import {
+  Notification,
+  NotificationChannel,
+  NotificationPreferences,
+} from '../../../shared/dist/types';
 import { NotificationRepository } from '../models/notificationRepository';
 import { PreferenceRepository, NotificationSchedule } from '../models/preferenceRepository';
 import { EmailService } from './emailService';
@@ -16,8 +20,8 @@ export interface NotificationRequest {
 }
 
 export class NotificationService {
-  private schedulerInterval?: NodeJS.Timeout;
-  private batchProcessorInterval?: NodeJS.Timeout;
+  private schedulerInterval?: NodeJS.Timeout | undefined;
+  private batchProcessorInterval?: NodeJS.Timeout | undefined;
 
   constructor(
     private notificationRepository: NotificationRepository,
@@ -27,7 +31,9 @@ export class NotificationService {
     private redis: RedisClientType
   ) {}
 
-  async sendNotification(request: NotificationRequest): Promise<{ success: boolean; notificationId?: string; error?: string }> {
+  async sendNotification(
+    request: NotificationRequest
+  ): Promise<{ success: boolean; notificationId?: string; error?: string }> {
     try {
       // Get user preferences
       const preferences = await this.preferenceRepository.getPreferences(request.userId);
@@ -69,16 +75,18 @@ export class NotificationService {
       return { success: true, notificationId: notification.id };
     } catch (error) {
       console.error('Failed to send notification:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
-  async sendBatchNotification(requests: NotificationRequest[]): Promise<{ success: boolean; results: any[] }> {
+  async sendBatchNotification(
+    requests: NotificationRequest[]
+  ): Promise<{ success: boolean; results: any[] }> {
     const results = [];
-    
+
     for (const request of requests) {
       const result = await this.sendNotification(request);
       results.push({ request, result });
@@ -101,7 +109,9 @@ export class NotificationService {
 
   async markAllAsRead(userId: string): Promise<void> {
     // Mark all in database
-    const notifications = await this.notificationRepository.findByUserId(userId, { unreadOnly: true });
+    const notifications = await this.notificationRepository.findByUserId(userId, {
+      unreadOnly: true,
+    });
     for (const notification of notifications) {
       await this.notificationRepository.markAsRead(notification.id, userId);
     }
@@ -158,12 +168,15 @@ export class NotificationService {
     console.log('Notification scheduler stopped');
   }
 
-  private determineChannels(request: NotificationRequest, preferences: NotificationPreferences): NotificationChannel[] {
+  private determineChannels(
+    request: NotificationRequest,
+    preferences: NotificationPreferences
+  ): NotificationChannel[] {
     const channels: NotificationChannel[] = [];
 
     // Use requested channels if specified, otherwise use preferences
     const requestedChannels = request.channels || [];
-    
+
     if (requestedChannels.length === 0) {
       // Use user preferences
       if (preferences.email) requestedChannels.push('EMAIL');
@@ -201,7 +214,7 @@ export class NotificationService {
   }
 
   private async deliverNotification(notification: Notification): Promise<void> {
-    const deliveryPromises = notification.channels.map(async channel => {
+    const deliveryPromises = notification.channels.map(async (channel: NotificationChannel) => {
       try {
         switch (channel.type) {
           case 'EMAIL':
@@ -255,7 +268,9 @@ export class NotificationService {
   private async deliverPush(notification: Notification): Promise<void> {
     // Push notification implementation would go here
     // For now, just log that it would be sent
-    console.log(`Push notification would be sent to user ${notification.userId}: ${notification.title}`);
+    console.log(
+      `Push notification would be sent to user ${notification.userId}: ${notification.title}`
+    );
   }
 
   private async getUserEmail(userId: string): Promise<string | null> {
@@ -264,7 +279,10 @@ export class NotificationService {
     return `user-${userId}@example.com`;
   }
 
-  private async queueForLaterDelivery(request: NotificationRequest, schedule: NotificationSchedule): Promise<void> {
+  private async queueForLaterDelivery(
+    request: NotificationRequest,
+    _schedule: NotificationSchedule
+  ): Promise<void> {
     const queueKey = `notification_queue:${request.userId}`;
     const queueData = {
       ...request,
@@ -276,7 +294,7 @@ export class NotificationService {
 
   private async processPendingNotifications(): Promise<void> {
     const notifications = await this.notificationRepository.getPendingNotifications(50);
-    
+
     for (const notification of notifications) {
       await this.deliverNotification(notification);
     }
@@ -285,11 +303,13 @@ export class NotificationService {
   private async processBatchedNotifications(): Promise<void> {
     // Get all user queue keys
     const queueKeys = await this.redis.keys('notification_queue:*');
-    
+
     for (const queueKey of queueKeys) {
       const userId = queueKey.split(':')[1];
+      if (!userId) continue;
+
       const schedule = await this.preferenceRepository.getSchedule(userId);
-      
+
       if (!schedule.enableBatching) {
         continue;
       }
@@ -315,7 +335,9 @@ export class NotificationService {
     }
   }
 
-  async cleanupOldNotifications(daysOld: number = 30): Promise<{ database: number; redis: number }> {
+  async cleanupOldNotifications(
+    daysOld: number = 30
+  ): Promise<{ database: number; redis: number }> {
     const databaseCleaned = await this.notificationRepository.deleteOldNotifications(daysOld);
     const redisCleaned = await this.inAppService.cleanupOldNotifications(daysOld);
 
@@ -329,3 +351,4 @@ export class NotificationService {
   async getSchedule(userId: string): Promise<NotificationSchedule> {
     return this.preferenceRepository.getSchedule(userId);
   }
+}

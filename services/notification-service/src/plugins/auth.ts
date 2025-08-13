@@ -30,7 +30,7 @@ export const authPlugin: FastifyPluginAsync = async fastify => {
     const token = authHeader.substring(7);
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret') as any;
+      const decoded = jwt.verify(token, process.env['JWT_SECRET'] || 'dev-secret') as any;
       request.user = {
         id: decoded.userId || decoded.id,
         userId: decoded.userId || decoded.id,

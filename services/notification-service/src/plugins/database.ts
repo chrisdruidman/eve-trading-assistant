@@ -9,7 +9,7 @@ declare module 'fastify' {
 
 export const databasePlugin: FastifyPluginAsync = async fastify => {
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env['DATABASE_URL'],
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,

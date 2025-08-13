@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { Notification } from '../../../shared/src/types';
+import { Notification } from '../../../shared/dist/types';
 
 export interface EmailTemplate {
   subject: string;
@@ -11,13 +11,13 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
-      host: process.env.SMTP_HOST || 'localhost',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
+    this.transporter = nodemailer.createTransport({
+      host: process.env['SMTP_HOST'] || 'localhost',
+      port: parseInt(process.env['SMTP_PORT'] || '587', 10),
+      secure: process.env['SMTP_SECURE'] === 'true',
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env['SMTP_USER'],
+        pass: process.env['SMTP_PASS'],
       },
     });
   }

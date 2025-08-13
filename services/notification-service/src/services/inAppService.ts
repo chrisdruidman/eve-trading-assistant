@@ -1,5 +1,5 @@
 import { RedisClientType } from 'redis';
-import { Notification } from '../../../shared/src/types';
+import { Notification } from '../../../shared/dist/types';
 
 export class InAppService {
   constructor(private redis: RedisClientType) {}

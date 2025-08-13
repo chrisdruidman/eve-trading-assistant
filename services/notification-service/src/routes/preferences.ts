@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { NotificationPreferences } from '../../../shared/src/types';
+import { NotificationPreferences } from '../../../shared/dist/types';
 import { NotificationSchedule } from '../models/preferenceRepository';
 
 export const preferenceRoutes: FastifyPluginAsync = async fastify => {

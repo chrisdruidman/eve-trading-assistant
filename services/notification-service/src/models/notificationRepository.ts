@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { Notification, NotificationChannel } from '../../../shared/src/types';
+import { Notification, NotificationChannel } from '../../../shared/dist/types';
 
 export class NotificationRepository {
   constructor(private db: Pool) {}

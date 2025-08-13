@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { NotificationPreferences } from '../../../shared/src/types';
+import { NotificationPreferences } from '../../../shared/dist/types';
 
 export interface NotificationSchedule {
   userId: string;

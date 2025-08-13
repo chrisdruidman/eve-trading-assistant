@@ -11,7 +11,7 @@ import { redisPlugin } from './plugins/redis';
 
 const server = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: process.env['LOG_LEVEL'] || 'info',
   },
 });
 
@@ -20,7 +20,7 @@ async function start() {
     // Register security plugins
     await server.register(helmet);
     await server.register(cors, {
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+      origin: process.env['CORS_ORIGIN'] || 'http://localhost:3000',
       credentials: true,
     });
 
@@ -47,8 +47,8 @@ async function start() {
       return { status: 'ok', service: 'notification-service' };
     });
 
-    const port = parseInt(process.env.PORT || '3004', 10);
-    const host = process.env.HOST || '0.0.0.0';
+    const port = parseInt(process.env['PORT'] || '3004', 10);
+    const host = process.env['HOST'] || '0.0.0.0';
 
     await server.listen({ port, host });
     console.log(`Notification service listening on ${host}:${port}`);
