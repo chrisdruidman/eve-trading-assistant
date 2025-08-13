@@ -57,7 +57,7 @@ graph LR
     - **includes**: Validation for inputs (budget, constraints) and pagination for results.
     - **deps**: [T-05]
 
-- [ ] [T-07] Frontend: Suggestions UI
+- [x] [T-07] Frontend: Suggestions UI
     - **goal**: Basic UI to trigger a run, view suggestions, and inspect rationales and risk flags.
     - **includes**: Client-side table with sorting and filtering; no order placement.
     - **deps**: [T-06]

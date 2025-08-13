@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
@@ -40,6 +41,8 @@ const ListQuerySchema = z.object({
 	run_id: z.string().optional(),
 	page: z.number().int().min(1).default(1),
 	limit: z.number().int().min(1).max(200).default(50),
+	side: z.enum(['buy', 'sell']).optional(),
+	min_margin: z.number().min(0).optional(),
 });
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
@@ -124,16 +127,24 @@ async function handleListSuggestions(
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		const pageNum = Number(url.searchParams.get('page') ?? '1');
 		const limitNum = Number(url.searchParams.get('limit') ?? '50');
+		const sideParam = url.searchParams.get('side');
+		const minMarginNum = Number(url.searchParams.get('min_margin') ?? '');
 		const parsed = ListQuerySchema.safeParse({
 			run_id: url.searchParams.get('run_id') ?? undefined,
 			page: pageNum,
 			limit: limitNum,
+			side:
+				sideParam === 'buy' || sideParam === 'sell'
+					? (sideParam as 'buy' | 'sell')
+					: undefined,
+			min_margin:
+				Number.isFinite(minMarginNum) && minMarginNum >= 0 ? minMarginNum : undefined,
 		});
 		if (!parsed.success) {
 			json(res, 400, { error: 'invalid_request', details: parsed.error.flatten() });
 			return;
 		}
-		const { run_id, page, limit } = parsed.data;
+		const { run_id, page, limit, side, min_margin } = parsed.data;
 		const db = new DatabaseConstructor(config.dbPath);
 		try {
 			let run = null as any;
@@ -150,20 +161,32 @@ async function handleListSuggestions(
 				json(res, 404, { error: 'not_found', message: 'No suggestion run found' });
 				return;
 			}
+			// Build dynamic filtering SQL for side and min_margin
+			const whereClauses = ['run_id = ?'];
+			const params: any[] = [run.run_id];
+			if (side) {
+				whereClauses.push('side = ?');
+				params.push(side);
+			}
+			if (typeof min_margin === 'number') {
+				whereClauses.push('expected_margin >= ?');
+				params.push(min_margin);
+			}
+			const whereSql = whereClauses.join(' AND ');
 			const totalRow = db
-				.prepare(`SELECT COUNT(1) as cnt FROM suggested_order WHERE run_id = ?`)
-				.get(run.run_id) as { cnt: number };
+				.prepare(`SELECT COUNT(1) as cnt FROM suggested_order WHERE ${whereSql}`)
+				.get(...params) as { cnt: number };
 			const total = Number(totalRow?.cnt ?? 0);
 			const offset = (page - 1) * limit;
 			const rows = db
 				.prepare(
 					`SELECT suggestion_id, run_id, type_id, side, quantity, unit_price, expected_margin, rationale
 					 FROM suggested_order
-					 WHERE run_id = ?
+					 WHERE ${whereSql}
 					 ORDER BY expected_margin DESC
 					 LIMIT ? OFFSET ?`,
 				)
-				.all(run.run_id, limit, offset);
+				.all(...params, limit, offset);
 			json(res, 200, {
 				run,
 				suggestions: rows,
@@ -185,9 +208,66 @@ export function createServer(config?: { dbPath?: string; userAgent?: string }): 
 		config?.dbPath ?? process.env.SQLITE_DB_PATH ?? path.resolve('packages/backend/dev.sqlite');
 	const userAgent = config?.userAgent ?? process.env.USER_AGENT ?? undefined;
 
+	// Static file roots
+	const frontendPublicDir = path.resolve(__dirname, '..', '..', 'frontend', 'public');
+	const frontendDistDir = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
+
+	function contentTypeFor(filePath: string): string {
+		const ext = path.extname(filePath).toLowerCase();
+		switch (ext) {
+			case '.html':
+				return 'text/html; charset=utf-8';
+			case '.js':
+				return 'text/javascript; charset=utf-8';
+			case '.css':
+				return 'text/css; charset=utf-8';
+			case '.map':
+				return 'application/json; charset=utf-8';
+			case '.json':
+				return 'application/json; charset=utf-8';
+			default:
+				return 'application/octet-stream';
+		}
+	}
+
+	function tryServeStatic(
+		req: http.IncomingMessage,
+		res: http.ServerResponse,
+		url: URL,
+	): boolean {
+		if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+		let filePath: string | null = null;
+		if (url.pathname === '/' || url.pathname === '/index.html') {
+			filePath = path.join(frontendPublicDir, 'index.html');
+		} else if (url.pathname.startsWith('/assets/')) {
+			// Map /assets/* to dist/src/*
+			const rel = url.pathname.replace(/^\/assets\//, '');
+			filePath = path.join(frontendDistDir, 'src', rel);
+		} else {
+			// Try to serve from public directly
+			filePath = path.join(frontendPublicDir, url.pathname);
+		}
+		try {
+			const stat = fs.statSync(filePath);
+			if (!stat.isFile()) return false;
+			const body = fs.readFileSync(filePath);
+			res.writeHead(200, {
+				'content-type': contentTypeFor(filePath),
+				'content-length': String(body.length),
+			});
+			if (req.method === 'GET') res.end(body);
+			else res.end();
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	return http.createServer(async (req, res) => {
 		try {
 			const url = new URL(req.url ?? '/', 'http://localhost');
+			// Serve static frontend first
+			if (tryServeStatic(req, res, url)) return;
 			if (req.method === 'POST' && url.pathname === '/api/suggestions/run') {
 				await handleRunSuggestion(req, res, { dbPath, userAgent });
 				return;
