@@ -8,6 +8,7 @@ Key reference: [ESI Best Practices](https://developers.eveonline.com/docs/servic
 
 - Build a web app that suggests profitable market orders at Jita within a specified budget.
 - Only read data; do not place orders. Provide transparent rationales and risk flags.
+- The Agent initially uses the Anthropic API to analyze normalized market snapshots and produce suggestions with structured outputs.
 
 ## Ground Rules
 
@@ -22,6 +23,17 @@ Key reference: [ESI Best Practices](https://developers.eveonline.com/docs/servic
 - Organize code under `packages/backend`, `packages/frontend`, `packages/agent`, and `packages/shared`.
 - Enforce consistent formatting, linting, and type-checking. Use testing at unit and integration levels.
 - Document decisions in `docs/` with concise rationale when deviating from this guide.
+
+### LLM Provider and Usage (Anthropic)
+
+- Provider: Anthropic (Claude family). Start with a cost-effective, capable model; upgrade as needed.
+- Access: Server-side only from `packages/agent` to keep keys secure. Configure via environment variable `ANTHROPIC_API_KEY`.
+- I/O: The Agent prompts Anthropic with summary features derived from snapshots and requests JSON-only structured output for `suggestion_run` and `suggested_order` records.
+- Guardrails:
+    - Token and cost awareness: bound prompt size by sampling/aggregation; cap max tokens in responses.
+    - Determinism: constrain with explicit instructions, JSON schema, and validation; reject/repair malformed outputs.
+    - Privacy: do not send secrets or any PII. Only send derived, non-sensitive market features.
+    - Rate limits: implement retry with backoff on 429/5xx responses from Anthropic; log usage.
 
 ## ESI Integration Requirements
 
@@ -69,12 +81,25 @@ Fetch frequency must be bounded and cache-aware. Do not refetch within `expires`
 - `suggested_order(suggestion_id PK, run_id FK, type_id FK, side, quantity, unit_price, expected_margin, rationale)`
 - `esi_cache_entry(cache_key PK, url, etag, expires_at, last_modified, fetched_at, http_status)`
 
+### Agent Structured Output Contract
+
+- The Agent must return structured data that maps directly to the SQLite schema:
+    - `SuggestionRun`: `{ run_id, started_at, finished_at, strategy, budget }`
+    - `SuggestedOrder`: `{ suggestion_id, run_id, type_id, side, quantity, unit_price, expected_margin, rationale }`
+- Validate all LLM outputs against this contract (e.g., with Zod) before persistence or API exposure.
+
 ## Agent Design Principles
 
 - Deterministic inputs, explainable outputs: include supporting features and rationale alongside each suggestion.
 - Budget-aware portfolio: enforce max capital at risk, per-item caps, and diversification thresholds.
 - Conservative assumptions: under-estimate sell prices and over-estimate fees to avoid unrealistic profit claims.
 - Reproducibility: every suggestion belongs to a `suggestion_run` with parameters and derived metrics.
+
+### LLM-Oriented Strategy Notes
+
+- The baseline strategy leverages Anthropic to synthesize opportunities from buy/sell ladders at Jita using conservative fee assumptions and minimum volume thresholds.
+- The prompt includes only aggregated features per `type_id` (e.g., best bid/ask, spread, spread%, available volume) to stay within token budgets.
+- The Agent requests a JSON-only response conforming to the schema above; responses are validated and non-conforming items are dropped with clear logs.
 
 ### End-to-End Flow
 
@@ -85,13 +110,16 @@ sequenceDiagram
   participant ESI as ESI
   participant DB as SQLite
   participant AG as Agent
+  participant LLM as Anthropic
 
   UI->>API: Request suggestions (budget, constraints)
   API->>ESI: Fetch market data (with caching and user agent)
   ESI-->>API: Data + headers (ETag, expires, last-modified)
   API->>DB: Upsert snapshots and cache entries
   API->>AG: Invoke strategy with normalized snapshot_id
-  AG->>DB: Read snapshot, compute suggestions
+  AG->>DB: Read snapshot, aggregate features
+  AG->>LLM: Prompt with features and constraints (request JSON-only)
+  LLM-->>AG: Structured suggestions (validated)
   AG-->>API: Suggested orders + rationales
   API-->>UI: Render suggestions with metadata
 ```
@@ -120,3 +148,4 @@ sequenceDiagram
 
 - ESI best practices: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 - Project README: `../README.md`
+- Anthropic: `https://docs.anthropic.com/`

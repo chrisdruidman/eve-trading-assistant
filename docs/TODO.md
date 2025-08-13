@@ -46,9 +46,10 @@ graph LR
     - **includes**: One-way migrations stored in `packages/backend/migrations`.
     - **deps**: [T-01]
 
-- [ ] [T-05] Agent: Baseline Heuristic Strategy
-    - **goal**: Produce simple buy/sell suggestions using spreads, volumes, and fees; attach rationales.
-    - **includes**: Conservative price/fee assumptions, min volume thresholds, per-type caps.
+- [ ] [T-05] Agent: Baseline Strategy (Anthropic-powered)
+    - **goal**: Use Anthropic to analyze aggregated Jita snapshot features and return structured buy/sell suggestions with rationales.
+    - **includes**: Conservative fee assumptions, min volume thresholds, per-type budget caps, JSON-only structured output validation.
+    - **notes**: Server-side only; configure `ANTHROPIC_API_KEY`. Do not send raw PII; only derived market features.
     - **deps**: [T-03], [T-04]
 
 - [ ] [T-06] Backend: Suggestion API Endpoints
