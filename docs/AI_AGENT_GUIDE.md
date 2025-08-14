@@ -138,6 +138,9 @@ sequenceDiagram
 - Linting and formatting: consistent across packages.
 - Type-safety: exported APIs and DTOs explicitly typed.
 - Observability: structured logs, correlation IDs, request outcome metrics, error-limit metrics.
+    - Backend `EsiClient` emits structured logs for backoff events (`esi_backoff`) and request summaries (`esi_request`).
+    - After a run, the server logs a concise `esi_metrics_summary` and includes an `esi` telemetry object in `POST /api/suggestions/run` responses.
+    - Programmatic access to in-process ESI metrics is available via `EsiClient#getMetrics()`.
 
 ## Development Workflow
 

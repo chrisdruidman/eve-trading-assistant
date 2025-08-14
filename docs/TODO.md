@@ -76,8 +76,13 @@ graph LR
     - **goal**: Allocate budget across suggestions with diversification and per-type caps.
     - **deps**: [T-05]
 
-- [ ] [T-11] Ops: Error-Limit Telemetry + Backoff Controls
+- [x] [T-11] Ops: Error-Limit Telemetry + Backoff Controls
     - **goal**: Emit metrics for `X-ESI-Error-Limit-*`, retries, and cache hit rates; surface in logs.
+    - **includes**:
+        - Instrumented `EsiClient` with jittered exponential backoff, max retries, and metrics exposure via `getMetrics()`.
+        - Captures `X-ESI-Error-Limit-Remain` and `X-ESI-Error-Limit-Reset` from responses.
+        - Emits structured logs for backoff events (`esi_backoff`) and request summaries (`esi_request`).
+        - Server includes an `esi` metrics object in `POST /api/suggestions/run` responses and prints `esi_metrics_summary` to logs.
     - **deps**: [T-02]
     - **refs**: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 

@@ -45,4 +45,7 @@ Thumbs.db
 data/**/*.sqlite
 data/**/*.db
 
+# Test SQLite databases
+**/test-db-*.sqlite
+
 

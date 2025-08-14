@@ -7,7 +7,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 ### Status
 
 - Monorepo scaffolding in place (npm workspaces, TypeScript base config, lint/format, tests, CI). [T-01] complete.
-- Backend ESI client + SQLite cache layer implemented with User-Agent, ETag/If-None-Match, and retry/backoff; tested. [T-02] complete.
+- Backend ESI client + SQLite cache layer implemented with User-Agent, ETag/If-None-Match, retry/backoff, and error-limit telemetry; tested. [T-02] complete.
 - Backend market snapshot ingestion for The Forge with pagination consistency checks and Jita filtering, exposed via `fetchForgeJitaOrderSnapshots`. [T-03] complete.
 - SQLite migrations added for `suggestion_run` and `suggested_order`, with a migration runner `runSqliteMigrations`. [T-04] complete.
 - Agent baseline implemented using Anthropic to produce structured suggestions from aggregated market features. Default model: `claude-sonnet-4-20250514` (override via `ANTHROPIC_MODEL`). [T-05] complete.
@@ -16,6 +16,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Database price history loader for The Forge with upsert semantics to `price_history_daily` via `/markets/{region_id}/history/`. Programmatic APIs: `fetchForgePriceHistory`, `upsertPriceHistoryRows`, `loadForgePriceHistoryForTypes`. [T-08] complete.
 - Agent risk/volatility features: compute 30d coefficient of variation and average volume from `price_history_daily`; filter and enrich features for the LLM. Backend exposes `selectRiskMetricsByType` and server passes `riskByType` to the agent. New agent options: `maxCv30d`, `minAvgVolume30d`. [T-09] complete.
 - Agent budget and position sizing: greedy allocation with per-type budget caps and diversification; respects total budget and caps during suggestion finalization. [T-10] complete.
+    - Ops error-limit telemetry and backoff controls: structured logs for ESI backoff and per-run metrics surfaced in API response. [T-11] complete.
 
 ## Scope and Principles
 
@@ -181,7 +182,8 @@ upsertPriceHistoryRows({ dbPath, regionId: 10000002, typeId: 34, rows });
 API Endpoints:
 
 - `POST /api/suggestions/run` — body: `{ "budget": number, "options"?: {...}, "maxPages"?: number }`
-    - Runs a pass: ingests market snapshots for Jita, computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage }`.
+    - Runs a pass: ingests market snapshots for Jita, computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage, esi }`.
+    - `esi` contains telemetry for the ESI client during the run: `{ requests, cache_hits_304, retries, error_limit_remain, error_limit_reset }`.
 - `GET /api/suggestions?run_id=...&page=1&limit=50` — lists suggestions for a run (or the latest run when `run_id` is omitted), with pagination metadata.
 
 Frontend:

@@ -100,10 +100,32 @@ async function handleRunSuggestion(
 			riskByType,
 		});
 		persistSuggestionsToSqlite(dbPath, run, suggestions);
+		const esiMetrics = esi.getMetrics();
+		// Emit a concise metrics log for observability
+		// eslint-disable-next-line no-console
+		console.log(
+			JSON.stringify({
+				type: 'esi_metrics_summary',
+				requests: esiMetrics.totalRequests,
+				cache_hits_304: esiMetrics.totalCacheHits304,
+				retries: esiMetrics.totalRetries,
+				error_limit_remain: esiMetrics.lastErrorLimitRemain,
+				error_limit_reset: esiMetrics.lastErrorLimitReset,
+				last_status: esiMetrics.lastStatus,
+				last_url: esiMetrics.lastUrl,
+			}),
+		);
 		json(res, 200, {
 			run,
 			counts: { suggestions: suggestions.length },
 			usage,
+			esi: {
+				requests: esiMetrics.totalRequests,
+				cache_hits_304: esiMetrics.totalCacheHits304,
+				retries: esiMetrics.totalRetries,
+				error_limit_remain: esiMetrics.lastErrorLimitRemain,
+				error_limit_reset: esiMetrics.lastErrorLimitReset,
+			},
 		});
 	} catch (err: any) {
 		json(res, 500, { error: 'internal_error', message: String(err?.message ?? err) });
