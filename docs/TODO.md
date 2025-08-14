@@ -111,19 +111,21 @@ graph LR
         - `npm run dev` or `npm run -w @eve-jita-ai/frontend dev` + backend starts, app loads; run suggestions; filters and pagination behave.
         - Frontend smoke tests pass; docs updated.
 
-- [ ] [T-17] Backend: 5-Minute Market Snapshot Cache
-    - **goal**: Avoid re-fetching rapidly changing Jita market data on every run by introducing a server-side cache with a default 5-minute TTL.
+- [ ] [T-17] Backend: Scheduled 5-Minute Market Snapshots + Run Uses Stored Data
+    - **goal**: Automatically fetch and persist Jita market snapshots every 5 minutes and make `POST /api/suggestions/run` consume the stored snapshots instead of fetching on-demand.
     - **includes**:
-        - Cache `fetchForgeJitaOrderSnapshots` results (The Forge/Jita) in-memory or in SQLite keyed by region/system with `snapshots`, `last_modified`, `fetched_at`.
-        - On `POST /api/suggestions/run`, if the most recent snapshot is fresher than TTL (default 300,000 ms), return cached snapshots without hitting ESI.
-        - Make TTL configurable via env var `MARKET_SNAPSHOT_TTL_MS` (default 300000).
-        - Emit observability: include `market_cache_hit` boolean in response and log an event when cache is used or refreshed.
-        - Fallback: if cache is stale or missing, fetch from ESI, refresh cache, and proceed.
+        - Add a background scheduler in the backend that invokes `fetchForgeJitaOrderSnapshots` for The Forge/Jita every 5 minutes.
+        - Persist results in-memory or in SQLite keyed by region/system with `snapshots`, `last_modified`, and `fetched_at`.
+        - On server start, perform an immediate snapshot fetch (non-blocking) so the first run has data without waiting for the first interval.
+        - Update `POST /api/suggestions/run` to read the latest stored snapshot and never call ESI during the run request path.
+        - Configurables via env: `MARKET_SNAPSHOT_INTERVAL_MS` (default 300000) and `MARKET_SNAPSHOT_STALE_MS` (default 300000) for warning/health reporting.
+        - Observability: log scheduled fetch start/end, duration, success/failure; include `market_snapshot_used: true`, `snapshot_age_ms`, and `snapshot_timestamp` in run responses.
+        - Fallback: if no snapshot exists yet (e.g., just after boot and before first fetch completes), degrade gracefully by responding with 503 and guidance, rather than hitting ESI in the run path.
     - **deps**: [T-03], [T-11]
     - **acceptance**:
-        - Starting multiple runs within 5 minutes makes zero ESI network calls; response shows `market_cache_hit: true`.
-        - After TTL expiry, the next run fetches from ESI, refreshes the cache, and response shows `market_cache_hit: false`.
-        - TTL can be tuned via env and verified via logs.
+        - The backend logs show an immediate fetch on startup and subsequent scheduled fetches approximately every 5 minutes (configurable).
+        - Triggering multiple `POST /api/suggestions/run` calls results in zero ESI network calls; responses include `market_snapshot_used: true` and reasonable `snapshot_age_ms`.
+        - Changing `MARKET_SNAPSHOT_INTERVAL_MS` affects the schedule without code changes; `snapshot_age_ms` and logs reflect the new cadence.
 
 ### Nice-to-Haves
 
