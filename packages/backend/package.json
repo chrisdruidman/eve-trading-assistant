@@ -15,7 +15,8 @@
 	"dependencies": {
 		"better-sqlite3": "^9.6.0",
 		"zod": "^3.23.8",
-		"@eve-jita-ai/agent": "^0.1.0"
+		"@eve-jita-ai/agent": "^0.1.0",
+		"dotenv": "^16.4.5"
 	},
 	"devDependencies": {
 		"tsx": "^4.19.1",

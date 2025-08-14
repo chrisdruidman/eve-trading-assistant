@@ -28,6 +28,7 @@ Key reference: [ESI Best Practices](https://developers.eveonline.com/docs/servic
 
 - Provider: Anthropic (Claude family). Default model: `claude-sonnet-4-20250514`. Override via `ANTHROPIC_MODEL`.
 - Access: Server-side only from `packages/agent` to keep keys secure. Configure via environment variable `ANTHROPIC_API_KEY`.
+    - For local development, copy `.env.example` to `.env` at the repository root and set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`). `.env` is git-ignored.
 - I/O: The Agent prompts Anthropic with summary features derived from snapshots and requests JSON-only structured output for `suggestion_run` and `suggested_order` records.
 - Guardrails:
     - Token and cost awareness: bound prompt size by sampling/aggregation; cap max tokens in responses.

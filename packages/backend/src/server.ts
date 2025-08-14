@@ -3,6 +3,7 @@ import { URL } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 import { z } from 'zod';
 
@@ -18,6 +19,12 @@ import DatabaseConstructor from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env files
+// 1) Try package-local .env (when running from packages/backend)
+dotenv.config();
+// 2) Fallback to monorepo root .env (when .env is placed at repository root)
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '..', '.env') });
 
 const RunRequestSchema = z.object({
 	budget: z.number().positive(),

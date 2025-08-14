@@ -113,3 +113,7 @@ graph LR
 - Keep ESI usage within reasonable bounds; honor `expires` and prefer `If-None-Match` caching to avoid unnecessary load.
 - For paginated requests, ensure a consistent snapshot across pages; retry or abort if `last-modified` drifts.
 - Suggestions must include a brief rationale and conservative assumptions.
+
+### Local Environment Setup
+
+- Create a local `.env` by copying `.env.example` at the repo root. `.env` is ignored by git. Set at least `ANTHROPIC_API_KEY`; optionally configure `SQLITE_DB_PATH`, `USER_AGENT`, and ESI circuit settings.

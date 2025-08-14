@@ -165,9 +165,20 @@ npm run --workspace @eve-jita-ai/frontend build
 
 Environment variables:
 
+Create a `.env` file from the provided example before running locally:
+
+```bash
+cp .env.example .env
+# or on Windows PowerShell
+Copy-Item .env.example .env
+```
+
+Only commit `.env.example`. The `.env` file is ignored by git.
+
 - `SQLITE_DB_PATH`: path to the SQLite DB file (defaults to `packages/backend/dev.sqlite`).
 - `USER_AGENT`: optional override for the ESI User-Agent header.
 - `ANTHROPIC_API_KEY`: required to use the Anthropic-backed agent.
+- `ANTHROPIC_MODEL` (optional): defaults to `claude-sonnet-4-20250514`.
 - `ESI_CIRCUIT_FAILURE_THRESHOLD` (optional): failures to trigger open (default 5).
 - `ESI_CIRCUIT_OPEN_AFTER_MS` (optional): cooldown before half-open probes (default 60000).
 - `ESI_CIRCUIT_MIN_OPEN_MS` (optional): minimum open duration (default 30000).
