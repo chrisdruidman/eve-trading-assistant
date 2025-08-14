@@ -17,6 +17,7 @@ graph LR
   T05 --> T10[Agent: Budget + Position Sizing]
   T02 --> T11[Ops: Error-Limit Telemetry + Backoff]
   T11 --> T12[Ops: Circuit Breaker + Recovery]
+  T06 --> T16[Frontend: React + TypeScript Migration]
 ```
 
 ### Tasks
@@ -93,6 +94,22 @@ graph LR
         - Preemptive open when `X-ESI-Error-Limit-Remain` falls below threshold.
         - Server gracefully degrades `POST /api/suggestions/run` with 503, including latest run metadata and ESI metrics when circuit is open.
     - **deps**: [T-11]
+
+- [ ] [T-16] Frontend: React + TypeScript Migration
+    - **goal**: Replace the current vanilla/imperative UI with a conventional React + TypeScript app to simplify state management, testing, and ongoing feature work.
+    - **includes**:
+        - Scaffold React + TS in `packages/frontend` (Vite-based) with workspace-aware config.
+        - Move existing UI into components: `App`, `RunForm`, `Filters`, `SuggestionsTable`, `Pagination`.
+        - Reuse types from `@eve-jita-ai/shared` and centralize helpers (e.g., currency formatting).
+        - Configure build output to `packages/frontend/dist` and update backend static serving in `packages/backend/src/server.ts` to serve Vite output (`index.html` and `assets/*`).
+        - Add scripts: `dev` (Vite dev with proxy to backend), `build`/`preview`; integrate with root `npm run dev`.
+        - ESLint + TypeScript settings for React; add minimal tests (table renders, filtering, pagination) with Vitest + RTL.
+        - Remove legacy DOM-manual code paths and the hand-rolled `/assets/main.js` wiring.
+    - **deps**: [T-06]
+    - **acceptance**:
+        - `npm run -w @eve-jita-ai/frontend build` produces a working `dist` that is served by the backend at `http://localhost:3000/`.
+        - `npm run dev` starts backend and the app loads; running a suggestion works; filters and pagination behave correctly.
+        - All frontend tests pass; no new linter errors; docs updated where applicable.
 
 ### Nice-to-Haves
 
