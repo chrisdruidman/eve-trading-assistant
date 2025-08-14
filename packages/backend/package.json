@@ -10,7 +10,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"lint": "eslint .",
 		"test": "vitest run",
-		"dev": "tsx src/server.ts"
+		"dev": "tsx watch src/server.ts"
 	},
 	"dependencies": {
 		"better-sqlite3": "^9.6.0",

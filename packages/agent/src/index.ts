@@ -123,7 +123,7 @@ const LlmResponseSchema = z.object({
 function buildSystemPrompt(): string {
 	return [
 		'You are an assistant generating conservative, explainable market suggestions for EVE Online at Jita.',
-		'Only produce JSON that conforms to the requested schema. Do not include any commentary.',
+		'Only produce JSON that conforms to the requested schema. Respond with a single JSON object and nothing else. Do not include any commentary or code fences.',
 	].join(' ');
 }
 
@@ -187,6 +187,7 @@ function buildUserPrompt(
 		'Only include items where spread_pct >= minSpreadPct and sell_volume >= minVolume and best_ask != null and best_bid != null.',
 		'Prefer lower volatility (cv_30d <= maxCv30d) and adequate liquidity (avg_volume_30d >= minAvgVolume30d).',
 		'Prefer diversified picks across types. Respond with JSON object: { "suggestions": [...] } only.',
+		'Output must be valid strict JSON. No comments, no trailing commas, no NaN/Infinity, do not wrap in code fences, and do not include any text before or after the JSON.',
 		JSON.stringify(payload, null, 2),
 	].join('\n');
 }
@@ -228,13 +229,62 @@ class AnthropicClient {
 			const text = await res.text();
 			throw new Error(`Anthropic request failed: ${res.status} ${text}`);
 		}
-		const data = (await res.json()) as any;
-		const content =
-			Array.isArray(data.content) && data.content.length ? data.content[0].text : '';
+		const data = (await res.json()) as {
+			content?: Array<Record<string, unknown>>;
+			usage?: { input_tokens?: number; output_tokens?: number };
+		};
+		// Aggregate text and structured blocks (e.g., tool_use with input)
+		const parts: string[] = [];
+		if (Array.isArray(data?.content)) {
+			for (const block of data.content as Array<Record<string, unknown>>) {
+				if (block && typeof block === 'object') {
+					const textField = block['text'];
+					if (typeof textField === 'string') {
+						parts.push(textField);
+						continue;
+					}
+					const inputField = block['input'];
+					if (inputField && typeof inputField === 'object') {
+						try {
+							parts.push(JSON.stringify(inputField));
+						} catch {
+							// ignore
+						}
+						continue;
+					}
+				}
+			}
+		}
+		const content = parts.join('');
 		const inputTokens = data?.usage?.input_tokens as number | undefined;
 		const outputTokens = data?.usage?.output_tokens as number | undefined;
 		return { text: content, inputTokens, outputTokens };
 	}
+}
+
+function extractJsonFromText(text: string): string | null {
+	if (!text) return null;
+	let t = text.trim();
+	// Strip code fences if present
+	if (t.startsWith('```')) {
+		// ```json\n{...}\n```
+		const fenceMatch = t.match(/```(?:json)?\n([\s\S]*?)\n```/i);
+		if (fenceMatch && fenceMatch[1]) {
+			return fenceMatch[1].trim();
+		}
+		// Generic triple backticks anywhere
+		t = t
+			.replace(/^```[a-z]*\n?/i, '')
+			.replace(/\n?```\s*$/i, '')
+			.trim();
+	}
+	// Heuristic: take substring from first { to last }
+	const firstBrace = t.indexOf('{');
+	const lastBrace = t.lastIndexOf('}');
+	if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+		return t.slice(firstBrace, lastBrace + 1).trim();
+	}
+	return null;
 }
 
 export async function computeAnthropicBaselineSuggestions(
@@ -297,9 +347,14 @@ export async function computeAnthropicBaselineSuggestions(
 	// Parse and validate
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(completion.text);
+		const candidate = extractJsonFromText(completion.text) ?? completion.text;
+		parsed = JSON.parse(candidate);
 	} catch (e) {
-		throw new Error('LLM did not return valid JSON');
+		// Surface a small snippet to aid debugging while keeping response concise
+		const snippet = String(completion.text ?? '')
+			.slice(0, 200)
+			.replace(/\s+/g, ' ');
+		throw new Error(`LLM did not return valid JSON (first 200 chars): ${snippet}`);
 	}
 	const validated = LlmResponseSchema.safeParse(parsed);
 	if (!validated.success) {
