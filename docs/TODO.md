@@ -111,6 +111,20 @@ graph LR
         - `npm run dev` or `npm run -w @eve-jita-ai/frontend dev` + backend starts, app loads; run suggestions; filters and pagination behave.
         - Frontend smoke tests pass; docs updated.
 
+- [ ] [T-17] Backend: 5-Minute Market Snapshot Cache
+    - **goal**: Avoid re-fetching rapidly changing Jita market data on every run by introducing a server-side cache with a default 5-minute TTL.
+    - **includes**:
+        - Cache `fetchForgeJitaOrderSnapshots` results (The Forge/Jita) in-memory or in SQLite keyed by region/system with `snapshots`, `last_modified`, `fetched_at`.
+        - On `POST /api/suggestions/run`, if the most recent snapshot is fresher than TTL (default 300,000 ms), return cached snapshots without hitting ESI.
+        - Make TTL configurable via env var `MARKET_SNAPSHOT_TTL_MS` (default 300000).
+        - Emit observability: include `market_cache_hit` boolean in response and log an event when cache is used or refreshed.
+        - Fallback: if cache is stale or missing, fetch from ESI, refresh cache, and proceed.
+    - **deps**: [T-03], [T-11]
+    - **acceptance**:
+        - Starting multiple runs within 5 minutes makes zero ESI network calls; response shows `market_cache_hit: true`.
+        - After TTL expiry, the next run fetches from ESI, refreshes the cache, and response shows `market_cache_hit: false`.
+        - TTL can be tuned via env and verified via logs.
+
 ### Nice-to-Haves
 
 - [ ] [T-13] Backtesting Harness
@@ -124,6 +138,17 @@ graph LR
 - [ ] [T-15] Multi-Region Support
     - **goal**: Expand beyond Jita after the core system is stable and respectful of ESI.
     - **deps**: [T-03], [T-06]
+
+- [ ] [T-18] Nice-to-Have: Reduce Market Snapshot TTL Toward 1 Minute
+    - **goal**: Explore safely reducing snapshot TTL for fresher UI/agent inputs while respecting ESI limits.
+    - **includes**:
+        - Parameterize TTL and add guardrails (min TTL, request budgets, circuit thresholds).
+        - Add monitoring to track request volume and cache efficiency; alert on excessive calls.
+        - Experiment with 1–2 minute TTL and validate ESI behavior and app performance.
+    - **deps**: [T-17]
+    - **acceptance**:
+        - With 1–2 minute TTL, request rates remain within safe bounds, and cache hit rates are acceptable.
+        - Ability to roll back to 5 minutes via config without redeploys.
 
 ### Notes
 
