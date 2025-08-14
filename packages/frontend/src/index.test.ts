@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { placeholder } from './index';
+import { render, screen } from '@testing-library/react';
+import { App } from './main';
 
 describe('frontend smoke', () => {
-	it('placeholder readiness string', () => {
-		expect(placeholder).toBe('frontend-ready');
+	it('renders scaffolding without crashing', () => {
+		render(<App />);
+		expect(screen.getByText(/Suggestions/i)).toBeInTheDocument();
 	});
 });

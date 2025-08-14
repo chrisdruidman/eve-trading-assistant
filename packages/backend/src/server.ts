@@ -16,6 +16,7 @@ import {
 	persistSuggestionsToSqlite,
 } from '@eve-jita-ai/agent';
 import DatabaseConstructor from 'better-sqlite3';
+import type { Database } from 'better-sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,7 +66,11 @@ function json(res: http.ServerResponse, status: number, body: unknown): void {
 async function readJson<T>(req: http.IncomingMessage): Promise<T> {
 	const chunks: Buffer[] = [];
 	for await (const chunk of req) {
-		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as any));
+		if (Buffer.isBuffer(chunk)) {
+			chunks.push(chunk);
+		} else {
+			chunks.push(Buffer.from(String(chunk)));
+		}
 	}
 	const raw = Buffer.concat(chunks).toString('utf8');
 	return raw ? (JSON.parse(raw) as T) : ({} as T);
@@ -135,8 +140,8 @@ async function handleRunSuggestion(
 				error_limit_reset: esiMetrics.lastErrorLimitReset,
 				last_status: esiMetrics.lastStatus,
 				last_url: esiMetrics.lastUrl,
-				circuit_state: (esiMetrics as any).circuit_state,
-				circuit_opened_reason: (esiMetrics as any).circuit_opened_reason,
+				circuit_state: esiMetrics.circuit_state,
+				circuit_opened_reason: esiMetrics.circuit_opened_reason,
 			}),
 		);
 		json(res, 200, {
@@ -149,32 +154,44 @@ async function handleRunSuggestion(
 				retries: esiMetrics.totalRetries,
 				error_limit_remain: esiMetrics.lastErrorLimitRemain,
 				error_limit_reset: esiMetrics.lastErrorLimitReset,
-				circuit_state: (esiMetrics as any).circuit_state,
-				circuit_opened_reason: (esiMetrics as any).circuit_opened_reason,
+				circuit_state: esiMetrics.circuit_state,
+				circuit_opened_reason: esiMetrics.circuit_opened_reason,
 			},
 		});
-	} catch (err: any) {
-		if (err instanceof CircuitOpenError || err?.name === 'CircuitOpenError') {
+	} catch (err) {
+		if (
+			err instanceof CircuitOpenError ||
+			(err as unknown as { name?: string })?.name === 'CircuitOpenError'
+		) {
 			// Graceful degradation: return latest run metadata when circuit is open
 			const db = new DatabaseConstructor(config.dbPath);
 			try {
 				const latest = selectLatestRun(db);
 				json(res, 503, {
 					error: 'circuit_open',
-					message: String(err.message ?? 'ESI circuit open'),
+					message: String((err as Error).message ?? 'ESI circuit open'),
 					latest_run: latest,
-					esi: err?.esi_metrics ?? null,
+					esi: (err as unknown as { esi_metrics?: unknown }).esi_metrics ?? null,
 				});
 				return;
 			} finally {
 				db.close();
 			}
 		}
-		json(res, 500, { error: 'internal_error', message: String(err?.message ?? err) });
+		json(res, 500, {
+			error: 'internal_error',
+			message: String((err as Error)?.message ?? err),
+		});
 	}
 }
 
-function selectLatestRun(db: any): any | null {
+function selectLatestRun(db: Database): {
+	run_id: string;
+	started_at: string;
+	finished_at: string | null;
+	strategy: string;
+	budget: number;
+} | null {
 	const row = db
 		.prepare(
 			`SELECT run_id, started_at, finished_at, strategy, budget
@@ -182,7 +199,15 @@ function selectLatestRun(db: any): any | null {
 			 ORDER BY datetime(started_at) DESC
 			 LIMIT 1`,
 		)
-		.get();
+		.get() as
+		| {
+				run_id: string;
+				started_at: string;
+				finished_at: string | null;
+				strategy: string;
+				budget: number;
+		  }
+		| undefined;
 	return row ?? null;
 }
 
@@ -215,13 +240,25 @@ async function handleListSuggestions(
 		const { run_id, page, limit, side, min_margin } = parsed.data;
 		const db = new DatabaseConstructor(config.dbPath);
 		try {
-			let run = null as any;
+			let run: {
+				run_id: string;
+				started_at: string;
+				finished_at: string | null;
+				strategy: string;
+				budget: number;
+			} | null = null;
 			if (run_id) {
 				run = db
 					.prepare(
 						`SELECT run_id, started_at, finished_at, strategy, budget FROM suggestion_run WHERE run_id = ?`,
 					)
-					.get(run_id);
+					.get(run_id) as {
+					run_id: string;
+					started_at: string;
+					finished_at: string | null;
+					strategy: string;
+					budget: number;
+				} | null;
 			} else {
 				run = selectLatestRun(db);
 			}
@@ -231,7 +268,7 @@ async function handleListSuggestions(
 			}
 			// Build dynamic filtering SQL for side and min_margin
 			const whereClauses = ['run_id = ?'];
-			const params: any[] = [run.run_id];
+			const params: unknown[] = [run.run_id];
 			if (side) {
 				whereClauses.push('side = ?');
 				params.push(side);
@@ -266,8 +303,9 @@ async function handleListSuggestions(
 		} finally {
 			db.close();
 		}
-	} catch (err: any) {
-		json(res, 500, { error: 'internal_error', message: String(err?.message ?? err) });
+	} catch (err) {
+		const e = err as Error;
+		json(res, 500, { error: 'internal_error', message: String(e?.message ?? err) });
 	}
 }
 
@@ -306,31 +344,37 @@ export function createServer(config?: { dbPath?: string; userAgent?: string }): 
 		url: URL,
 	): boolean {
 		if (req.method !== 'GET' && req.method !== 'HEAD') return false;
-		let filePath: string | null = null;
+		const tryFilesInOrder: string[] = [];
 		if (url.pathname === '/' || url.pathname === '/index.html') {
-			filePath = path.join(frontendPublicDir, 'index.html');
+			// Prefer Vite build output when present
+			tryFilesInOrder.push(path.join(frontendDistDir, 'index.html'));
+			tryFilesInOrder.push(path.join(frontendPublicDir, 'index.html'));
 		} else if (url.pathname.startsWith('/assets/')) {
-			// Map /assets/* to dist/src/*
+			// Map /assets/* to Vite dist/assets/*
 			const rel = url.pathname.replace(/^\/assets\//, '');
-			filePath = path.join(frontendDistDir, 'src', rel);
+			tryFilesInOrder.push(path.join(frontendDistDir, 'assets', rel));
 		} else {
-			// Try to serve from public directly
-			filePath = path.join(frontendPublicDir, url.pathname);
+			// Try Vite dist first, then public as fallback
+			tryFilesInOrder.push(path.join(frontendDistDir, url.pathname));
+			tryFilesInOrder.push(path.join(frontendPublicDir, url.pathname));
 		}
-		try {
-			const stat = fs.statSync(filePath);
-			if (!stat.isFile()) return false;
-			const body = fs.readFileSync(filePath);
-			res.writeHead(200, {
-				'content-type': contentTypeFor(filePath),
-				'content-length': String(body.length),
-			});
-			if (req.method === 'GET') res.end(body);
-			else res.end();
-			return true;
-		} catch {
-			return false;
+		for (const filePath of tryFilesInOrder) {
+			try {
+				const stat = fs.statSync(filePath);
+				if (!stat.isFile()) continue;
+				const body = fs.readFileSync(filePath);
+				res.writeHead(200, {
+					'content-type': contentTypeFor(filePath),
+					'content-length': String(body.length),
+				});
+				if (req.method === 'GET') res.end(body);
+				else res.end();
+				return true;
+			} catch {
+				continue;
+			}
 		}
+		return false;
 	}
 
 	return http.createServer(async (req, res) => {
@@ -347,8 +391,9 @@ export function createServer(config?: { dbPath?: string; userAgent?: string }): 
 				return;
 			}
 			json(res, 404, { error: 'not_found' });
-		} catch (err: any) {
-			json(res, 500, { error: 'internal_error', message: String(err?.message ?? err) });
+		} catch (err) {
+			const e = err as Error;
+			json(res, 500, { error: 'internal_error', message: String(e?.message ?? err) });
 		}
 	});
 }

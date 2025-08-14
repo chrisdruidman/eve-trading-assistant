@@ -1,5 +1,2 @@
-export const placeholder = 'frontend-ready';
-// Export types/helpers without running DOM code under test environment
-if (typeof window !== 'undefined') {
-	await import('./main');
-}
+// Legacy entry kept empty; Vite uses src/index.tsx
+export {};

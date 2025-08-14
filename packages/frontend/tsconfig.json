@@ -2,10 +2,16 @@
     "extends": "../../tsconfig.base.json",
     "compilerOptions": {
         "outDir": "dist",
-        "jsx": "react-jsx"
+        "jsx": "react-jsx",
+        "types": [
+            "vitest/globals",
+            "vite/client",
+            "@testing-library/jest-dom"
+        ]
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "vite.config.ts"
     ],
     "exclude": [
         "dist",

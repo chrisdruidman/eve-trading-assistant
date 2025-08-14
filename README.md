@@ -153,14 +153,16 @@ erDiagram
 
 ### Running locally
 
-After installing dependencies, you can run the backend API locally:
+After installing dependencies, you can run either an all-in-one flow or separate dev servers:
 
 ```bash
-# Terminal 1: start the backend (serves API and static UI)
-npm run --workspace @eve-jita-ai/backend dev
+# Option A: Vite dev server with proxy (recommended for UI development)
+npm run --workspace @eve-jita-ai/backend dev &
+npm run --workspace @eve-jita-ai/frontend dev
 
-# In another terminal: build the frontend assets once (for /assets/main.js)
+# Option B: build frontend and let backend serve static files
 npm run --workspace @eve-jita-ai/frontend build
+npm run --workspace @eve-jita-ai/backend dev
 ```
 
 Environment variables:
@@ -203,9 +205,10 @@ API Endpoints:
     - If the ESI circuit is open, the API responds with `503` and `{ error: 'circuit_open', message, latest_run, esi }`.
 - `GET /api/suggestions?run_id=...&page=1&limit=50` — lists suggestions for a run (or the latest run when `run_id` is omitted), with pagination metadata.
 
-Frontend:
+Frontend build:
 
-- Static UI is served by the backend at `/` after building the frontend. It calls the API to run and list suggestions. Client-side filters: side (buy/sell) and minimum expected margin.
+- The UI is now a React + TypeScript app built with Vite. The backend serves the Vite `dist` output at `/` in non-dev. During development, you can run Vite with a proxy to the backend. Client-side features: trigger a run, view suggestions with filtering and pagination. Types sourced from `@eve-jita-ai/shared`.
+- Build with `npm run -w @eve-jita-ai/frontend build` to produce `packages/frontend/dist`. The backend will serve `index.html` and assets from this directory.
 
 ## References
 

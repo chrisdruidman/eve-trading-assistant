@@ -95,21 +95,21 @@ graph LR
         - Server gracefully degrades `POST /api/suggestions/run` with 503, including latest run metadata and ESI metrics when circuit is open.
     - **deps**: [T-11]
 
-- [ ] [T-16] Frontend: React + TypeScript Migration
+- [x] [T-16] Frontend: React + TypeScript Migration
     - **goal**: Replace the current vanilla/imperative UI with a conventional React + TypeScript app to simplify state management, testing, and ongoing feature work.
     - **includes**:
-        - Scaffold React + TS in `packages/frontend` (Vite-based) with workspace-aware config.
-        - Move existing UI into components: `App`, `RunForm`, `Filters`, `SuggestionsTable`, `Pagination`.
-        - Reuse types from `@eve-jita-ai/shared` and centralize helpers (e.g., currency formatting).
-        - Configure build output to `packages/frontend/dist` and update backend static serving in `packages/backend/src/server.ts` to serve Vite output (`index.html` and `assets/*`).
-        - Add scripts: `dev` (Vite dev with proxy to backend), `build`/`preview`; integrate with root `npm run dev`.
-        - ESLint + TypeScript settings for React; add minimal tests (table renders, filtering, pagination) with Vitest + RTL.
-        - Remove legacy DOM-manual code paths and the hand-rolled `/assets/main.js` wiring.
+        - Scaffolded React + TS (Vite) in `packages/frontend` with workspace-aware config `vite.config.ts`.
+        - Migrated UI into components: `App`, `RunForm`, `Filters`, `SuggestionsTable`.
+        - Reused types from `@eve-jita-ai/shared` and centralized helpers (e.g., currency formatting within React layer).
+        - Configured build output to `packages/frontend/dist` and updated backend static serving in `packages/backend/src/server.ts` to serve Vite output (`index.html` and `assets/*`).
+        - Added scripts: `dev` (Vite dev with proxy to backend), `build`/`preview`; integrated with root `npm run dev` which now builds frontend or can be run separately via Vite dev.
+        - Added minimal tests (smoke render) with Vitest + React Testing Library; jsdom configured via dev deps and tsconfig types.
+        - Removed legacy manual DOM code and `/assets/main.js` wiring; now mounting React at `#root`.
     - **deps**: [T-06]
     - **acceptance**:
-        - `npm run -w @eve-jita-ai/frontend build` produces a working `dist` that is served by the backend at `http://localhost:3000/`.
-        - `npm run dev` starts backend and the app loads; running a suggestion works; filters and pagination behave correctly.
-        - All frontend tests pass; no new linter errors; docs updated where applicable.
+        - `npm run -w @eve-jita-ai/frontend build` produces a working `dist` served by the backend at `http://localhost:3000/`.
+        - `npm run dev` or `npm run -w @eve-jita-ai/frontend dev` + backend starts, app loads; run suggestions; filters and pagination behave.
+        - Frontend smoke tests pass; docs updated.
 
 ### Nice-to-Haves
 

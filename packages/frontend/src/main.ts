@@ -1,30 +1,4 @@
-type SuggestionRun = {
-	run_id: string;
-	started_at: string;
-	finished_at: string | null;
-	strategy: string;
-	budget: number;
-};
-
-type SuggestedOrder = {
-	suggestion_id: string;
-	run_id: string;
-	type_id: number;
-	side: 'buy' | 'sell';
-	quantity: number;
-	unit_price: number;
-	expected_margin: number;
-	rationale: string;
-};
-
-type ListResponse = {
-	run: SuggestionRun;
-	suggestions: SuggestedOrder[];
-	page: number;
-	limit: number;
-	total: number;
-	hasMore: boolean;
-};
+export {};
 
 async function apiRunSuggestions(budget: number): Promise<Response> {
 	return fetch('/api/suggestions/run', {
@@ -38,7 +12,14 @@ async function apiListSuggestions(params?: {
 	run_id?: string;
 	page?: number;
 	limit?: number;
-}): Promise<ListResponse> {
+}): Promise<{
+	run: SuggestionRun;
+	suggestions: SuggestedOrder[];
+	page: number;
+	limit: number;
+	total: number;
+	hasMore: boolean;
+}> {
 	const url = new URL('/api/suggestions', window.location.origin);
 	if (params?.run_id) url.searchParams.set('run_id', params.run_id);
 	if (params?.page) url.searchParams.set('page', String(params.page));
@@ -48,7 +29,14 @@ async function apiListSuggestions(params?: {
 		const text = await res.text();
 		throw new Error(`Failed to fetch suggestions: ${res.status} ${text}`);
 	}
-	return (await res.json()) as ListResponse;
+	return (await res.json()) as {
+		run: SuggestionRun;
+		suggestions: SuggestedOrder[];
+		page: number;
+		limit: number;
+		total: number;
+		hasMore: boolean;
+	};
 }
 
 function formatCurrency(value: number): string {
@@ -58,135 +46,196 @@ function formatCurrency(value: number): string {
 		currencyDisplay: 'code',
 	}).format(value);
 }
+type FiltersState = { side: 'all' | 'buy' | 'sell'; minMargin: number };
 
-function el<K extends keyof HTMLElementTagNameMap>(
-	tag: K,
-	props?: Record<string, any>,
-	...children: Array<Node | string>
-): HTMLElementTagNameMap[K] {
-	const node = document.createElement(tag);
-	if (props) Object.assign(node, props);
-	for (const child of children) {
-		node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
-	}
-	return node;
+function useSuggestions() {
+	const [page, setPage] = useState(1);
+	const [filters, setFilters] = useState<FiltersState>({ side: 'all', minMargin: 0 });
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [data, setData] = useState<{
+		run: SuggestionRun;
+		suggestions: SuggestedOrder[];
+		page: number;
+		limit: number;
+		total: number;
+		hasMore: boolean;
+	} | null>(null);
+
+	const refresh = useCallback(async (opts?: { page?: number }) => {
+		setLoading(true);
+		setError(null);
+		try {
+			const res = await apiListSuggestions({ page: opts?.page ?? page, limit: 50 });
+			setData(res);
+		} catch (e: any) {
+			setError(String(e?.message ?? e));
+		} finally {
+			setLoading(false);
+		}
+	}, [page]);
+
+	useEffect(() => {
+		refresh().catch(() => void 0);
+	}, [refresh]);
+
+	const filtered = useMemo(() => {
+		if (!data) return [] as SuggestedOrder[];
+		let rows = data.suggestions.slice();
+		if (filters.side === 'buy' || filters.side === 'sell') {
+			rows = rows.filter((s) => s.side === filters.side);
+		}
+		if (Number.isFinite(filters.minMargin) && filters.minMargin > 0) {
+			rows = rows.filter((s) => s.expected_margin >= filters.minMargin);
+		}
+		rows.sort((a, b) => b.expected_margin - a.expected_margin);
+		return rows;
+	}, [data, filters]);
+
+	return {
+		data,
+		loading,
+		error,
+		page,
+		setPage,
+		filters,
+		setFilters,
+		refresh,
+		filtered,
+	};
 }
 
-function renderSuggestions(container: HTMLElement, data: ListResponse): void {
-	const sideFilterEl = document.getElementById('side-filter') as HTMLSelectElement | null;
-	const minMarginEl = document.getElementById('min-margin') as HTMLInputElement | null;
-	const sideFilterVal = sideFilterEl?.value ?? 'all';
-	const minMarginVal = Number((minMarginEl?.value ?? '').trim() || '0');
-
-	let rows = data.suggestions.slice();
-	if (sideFilterVal === 'buy' || sideFilterVal === 'sell') {
-		rows = rows.filter((s) => s.side === (sideFilterVal as 'buy' | 'sell'));
-	}
-	if (Number.isFinite(minMarginVal) && minMarginVal > 0) {
-		rows = rows.filter((s) => s.expected_margin >= minMarginVal);
-	}
-	rows.sort((a, b) => b.expected_margin - a.expected_margin);
-
-	const table = el(
-		'table',
-		{ className: 'table' },
-		el(
-			'thead',
-			{},
-			el(
-				'tr',
-				{},
-				el('th', {}, 'Type ID'),
-				el('th', {}, 'Side'),
-				el('th', {}, 'Qty'),
-				el('th', {}, 'Unit Price'),
-				el('th', {}, 'Expected Margin'),
-				el('th', {}, 'Rationale'),
-			),
-		),
-		el(
-			'tbody',
-			{},
-			...rows.map((s) =>
-				el(
-					'tr',
-					{},
-					el('td', {}, String(s.type_id)),
-					el('td', {}, s.side),
-					el('td', {}, String(s.quantity)),
-					el('td', {}, formatCurrency(s.unit_price)),
-					el('td', {}, formatCurrency(s.expected_margin)),
-					el('td', {}, s.rationale),
-				),
-			),
-		),
+export function App(): React.ReactElement {
+	const state = useSuggestions();
+	return (
+		<div style={{ margin: '2rem', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif' }}>
+			<header style={{ marginBottom: '1rem' }}>
+				<h2>Suggestions</h2>
+				<p>Trigger a suggestion run and view results. Read-only, Jita-focused analysis.</p>
+			</header>
+			<RunForm onRunComplete={() => state.refresh()} />
+			<Filters
+				side={state.filters.side}
+				minMargin={state.filters.minMargin}
+				onChange={(f) => state.setFilters(f)}
+			/>
+			<SuggestionsTable
+				data={state.data}
+				rows={state.filtered}
+				loading={state.loading}
+				error={state.error}
+				onPrev={() => {
+					const next = Math.max(1, state.page - 1);
+					state.setPage(next);
+					state.refresh({ page: next });
+				}}
+				onNext={() => {
+					const next = state.page + 1;
+					state.setPage(next);
+					state.refresh({ page: next });
+				}}
+			/>
+		</div>
 	);
-
-	const info = el(
-		'div',
-		{ className: 'run-info' },
-		`Run ${data.run.run_id} • Strategy: ${data.run.strategy} • Budget: ${formatCurrency(
-			data.run.budget,
-		)} • ${data.total} suggestions`,
-	);
-
-	const pag = el('div', { className: 'pagination' });
-	const prev = el('button', { disabled: data.page <= 1 }, 'Prev');
-	const next = el('button', { disabled: !data.hasMore }, 'Next');
-	prev.addEventListener('click', () => refresh({ page: data.page - 1 }));
-	next.addEventListener('click', () => refresh({ page: data.page + 1 }));
-	pag.appendChild(prev);
-	pag.appendChild(el('span', { className: 'page' }, ` Page ${data.page} `));
-	pag.appendChild(next);
-
-	container.replaceChildren(info, table, pag);
 }
 
-async function refresh(opts?: { run_id?: string; page?: number; limit?: number }): Promise<void> {
-	const suggestionsEl = document.getElementById('suggestions')!;
-	suggestionsEl.textContent = 'Loading...';
-	try {
-		const data = await apiListSuggestions({
-			run_id: opts?.run_id,
-			page: opts?.page,
-			limit: opts?.limit,
-		});
-		renderSuggestions(suggestionsEl, data);
-	} catch (err: any) {
-		suggestionsEl.textContent = String(err?.message ?? err);
-	}
-}
+function RunForm({ onRunComplete }: { onRunComplete: () => void }): React.ReactElement {
+	const [budget, setBudget] = useState<string>('');
+	const [status, setStatus] = useState<string>('');
+	const [running, setRunning] = useState<boolean>(false);
 
-function mount(): void {
-	const form = document.getElementById('run-form') as HTMLFormElement;
-	const budgetInput = document.getElementById('budget') as HTMLInputElement;
-	const runBtn = document.getElementById('run-btn') as HTMLButtonElement;
-	const statusEl = document.getElementById('status') as HTMLDivElement;
-
-	form.addEventListener('submit', async (e) => {
+	const onSubmit = useCallback(async (e: React.FormEvent) => {
 		e.preventDefault();
-		const budget = Number(budgetInput.value);
-		if (!Number.isFinite(budget) || budget <= 0) {
-			statusEl.textContent = 'Enter a positive budget.';
+		const value = Number(budget);
+		if (!Number.isFinite(value) || value <= 0) {
+			setStatus('Enter a positive budget.');
 			return;
 		}
-		runBtn.disabled = true;
-		statusEl.textContent = 'Running... This may take a moment.';
+		setRunning(true);
+		setStatus('Running... This may take a moment.');
 		try {
-			const res = await apiRunSuggestions(budget);
+			const res = await apiRunSuggestions(value);
 			if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-			statusEl.textContent = 'Run complete.';
-			await refresh();
+			setStatus('Run complete.');
+			onRunComplete();
 		} catch (err: any) {
-			statusEl.textContent = `Run failed: ${String(err?.message ?? err)}`;
+			setStatus(`Run failed: ${String(err?.message ?? err)}`);
 		} finally {
-			runBtn.disabled = false;
+			setRunning(false);
 		}
-	});
+	}, [budget, onRunComplete]);
 
-	// Initial load of latest suggestions (if any)
-	refresh().catch(() => void 0);
+	return (
+		<form onSubmit={onSubmit} style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '1rem' }}>
+			<label htmlFor="budget">Budget (ISK):</label>
+			<input id="budget" name="budget" type="number" min={1} step={1} placeholder="100000000" required value={budget} onChange={(e) => setBudget(e.target.value)} style={{ width: '14rem', padding: '.4rem .5rem' }} />
+			<button id="run-btn" type="submit" disabled={running} style={{ padding: '.4rem .75rem' }}>Run</button>
+			<div id="status" style={{ minHeight: '1.25rem', color: '#444' }}>{status}</div>
+		</form>
+	);
 }
 
-window.addEventListener('DOMContentLoaded', mount);
-export {};
+function Filters(props: { side: 'all' | 'buy' | 'sell'; minMargin: number; onChange: (f: FiltersState) => void }): React.ReactElement {
+	return (
+		<section style={{ margin: '.5rem 0 1rem', display: 'flex', gap: '.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+			<label htmlFor="side-filter">Side:</label>
+			<select id="side-filter" value={props.side} onChange={(e) => props.onChange({ side: e.target.value as FiltersState['side'], minMargin: props.minMargin })}>
+				<option value="all">All</option>
+				<option value="buy">Buy</option>
+				<option value="sell">Sell</option>
+			</select>
+
+			<label htmlFor="min-margin">Min expected margin (ISK):</label>
+			<input id="min-margin" type="number" step={1} min={0} placeholder="0" value={String(props.minMargin)} onChange={(e) => props.onChange({ side: props.side, minMargin: Number(e.target.value || '0') })} />
+		</section>
+	);
+}
+
+function SuggestionsTable(props: {
+	data: { run: SuggestionRun; page: number; total: number; hasMore: boolean } | null;
+	rows: SuggestedOrder[];
+	loading: boolean;
+	error: string | null;
+	onPrev: () => void;
+	onNext: () => void;
+}): React.ReactElement {
+	if (props.error) return <div>{props.error}</div>;
+	if (props.loading && !props.data) return <div>Loading...</div>;
+	if (!props.data) return <div>No data loaded yet.</div>;
+	return (
+		<div>
+			<div className="run-info" style={{ margin: '.75rem 0', color: '#333' }}>
+				{`Run ${props.data.run.run_id} • Strategy: ${props.data.run.strategy} • Budget: ${formatCurrency(props.data.run.budget)} • ${props.data.total} suggestions`}
+			</div>
+			<table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+				<thead>
+					<tr>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Type ID</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Side</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Qty</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Unit Price</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Expected Margin</th>
+						<th style={{ textAlign: 'left', borderBottom: '1px solid #ddd', padding: '.5rem', background: '#f7f7f7', position: 'sticky', top: 0 }}>Rationale</th>
+					</tr>
+				</thead>
+				<tbody>
+					{props.rows.map((s) => (
+						<tr key={s.suggestion_id}>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{s.type_id}</td>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{s.side}</td>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{s.quantity}</td>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{formatCurrency(s.unit_price)}</td>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{formatCurrency(s.expected_margin)}</td>
+							<td style={{ borderBottom: '1px solid #ddd', padding: '.5rem' }}>{s.rationale}</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+			<div className="pagination" style={{ marginTop: '.75rem', display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+				<button onClick={props.onPrev} disabled={props.data.page <= 1}>Prev</button>
+				<span className="page">{` Page ${props.data.page} `}</span>
+				<button onClick={props.onNext} disabled={!props.data.hasMore}>Next</button>
+			</div>
+		</div>
+	);
+}

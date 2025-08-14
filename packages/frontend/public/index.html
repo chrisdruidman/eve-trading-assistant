@@ -70,43 +70,8 @@
 			<p>Trigger a suggestion run and view results. Read-only, Jita-focused analysis.</p>
 		</header>
 
-		<form id="run-form">
-			<label for="budget">Budget (ISK):</label>
-			<input
-				id="budget"
-				name="budget"
-				type="number"
-				min="1"
-				step="1"
-				placeholder="100000000"
-				required
-			/>
-			<button id="run-btn" type="submit">Run</button>
-			<div id="status"></div>
-		</form>
+		<div id="root"></div>
 
-		<section
-			style="
-				margin: 0.5rem 0 1rem;
-				display: flex;
-				gap: 0.75rem;
-				align-items: center;
-				flex-wrap: wrap;
-			"
-		>
-			<label for="side-filter">Side:</label>
-			<select id="side-filter">
-				<option value="all">All</option>
-				<option value="buy">Buy</option>
-				<option value="sell">Sell</option>
-			</select>
-
-			<label for="min-margin">Min expected margin (ISK):</label>
-			<input id="min-margin" type="number" step="1" min="0" placeholder="0" />
-		</section>
-
-		<div id="suggestions">No data loaded yet.</div>
-
-		<script type="module" src="/assets/main.js"></script>
+		<script type="module" src="/src/index.tsx"></script>
 	</body>
 </html>
