@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 import type { EsiHttp } from './index';
 
@@ -40,11 +40,12 @@ export type FetchJitaSnapshotsResult = {
 };
 
 function generateSnapshotId(): string {
-	if ('randomUUID' in crypto) {
-		return (crypto as unknown as { randomUUID: () => string }).randomUUID();
+	// Prefer built-in UUID when available
+	if (typeof randomUUID === 'function') {
+		return randomUUID();
 	}
-	return crypto
-		.createHash('sha256')
+	// Fallback: hash of entropy
+	return createHash('sha256')
 		.update(String(Math.random()) + Date.now())
 		.digest('hex');
 }

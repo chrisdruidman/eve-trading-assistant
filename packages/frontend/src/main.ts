@@ -189,3 +189,4 @@ function mount(): void {
 }
 
 window.addEventListener('DOMContentLoaded', mount);
+export {};

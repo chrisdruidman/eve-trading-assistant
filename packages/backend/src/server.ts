@@ -91,17 +91,17 @@ async function handleRunSuggestion(
 		const esi = new EsiClient({
 			dbPath,
 			userAgent: config.userAgent,
-			failureThreshold: process.env.ESI_CIRCUIT_FAILURE_THRESHOLD
-				? Number(process.env.ESI_CIRCUIT_FAILURE_THRESHOLD)
+			failureThreshold: process.env['ESI_CIRCUIT_FAILURE_THRESHOLD']
+				? Number(process.env['ESI_CIRCUIT_FAILURE_THRESHOLD'])
 				: undefined,
-			halfOpenAfterMs: process.env.ESI_CIRCUIT_OPEN_AFTER_MS
-				? Number(process.env.ESI_CIRCUIT_OPEN_AFTER_MS)
+			halfOpenAfterMs: process.env['ESI_CIRCUIT_OPEN_AFTER_MS']
+				? Number(process.env['ESI_CIRCUIT_OPEN_AFTER_MS'])
 				: undefined,
-			minOpenDurationMs: process.env.ESI_CIRCUIT_MIN_OPEN_MS
-				? Number(process.env.ESI_CIRCUIT_MIN_OPEN_MS)
+			minOpenDurationMs: process.env['ESI_CIRCUIT_MIN_OPEN_MS']
+				? Number(process.env['ESI_CIRCUIT_MIN_OPEN_MS'])
 				: undefined,
-			errorLimitOpenThreshold: process.env.ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD
-				? Number(process.env.ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD)
+			errorLimitOpenThreshold: process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD']
+				? Number(process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD'])
 				: undefined,
 		});
 		const { snapshots } = await fetchForgeJitaOrderSnapshots({ esi, maxPages });
@@ -266,8 +266,10 @@ async function handleListSuggestions(
 
 export function createServer(config?: { dbPath?: string; userAgent?: string }): http.Server {
 	const dbPath =
-		config?.dbPath ?? process.env.SQLITE_DB_PATH ?? path.resolve('packages/backend/dev.sqlite');
-	const userAgent = config?.userAgent ?? process.env.USER_AGENT ?? undefined;
+		config?.dbPath ??
+		process.env['SQLITE_DB_PATH'] ??
+		path.resolve('packages/backend/dev.sqlite');
+	const userAgent = config?.userAgent ?? process.env['USER_AGENT'] ?? undefined;
 
 	// Static file roots
 	const frontendPublicDir = path.resolve(__dirname, '..', '..', 'frontend', 'public');
@@ -350,7 +352,7 @@ export function startServer(config?: {
 	port?: number;
 }): http.Server {
 	const server = createServer({ dbPath: config?.dbPath, userAgent: config?.userAgent });
-	const port = config?.port ?? (process.env.PORT ? Number(process.env.PORT) : 3000);
+	const port = config?.port ?? (process.env['PORT'] ? Number(process.env['PORT']) : 3000);
 	server.listen(port, () => {
 		// eslint-disable-next-line no-console
 		console.log(`backend api listening on http://localhost:${port}`);

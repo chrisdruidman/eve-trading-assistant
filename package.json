@@ -16,6 +16,8 @@
 		"typecheck": "npm run -ws --if-present typecheck",
 		"lint": "npm run -ws --if-present lint",
 		"test": "npm run -ws --if-present test",
+		"dev": "npm run -w @eve-jita-ai/frontend build && npm run -w @eve-jita-ai/backend dev",
+		"start": "npm run dev",
 		"format": "prettier -c .",
 		"format:write": "prettier -w ."
 	},
