@@ -9,6 +9,7 @@ import { z } from 'zod';
 
 import { EsiClient, CircuitOpenError } from './esiClient';
 import { fetchForgeJitaOrderSnapshots } from './marketIngestion';
+import type { MarketOrderSnapshot } from './marketIngestion';
 import { selectRiskMetricsByType } from './priceHistory';
 import { runSqliteMigrations } from './db/migrate';
 import {
@@ -100,63 +101,98 @@ async function handleRunSuggestion(
 		const dbPath = config.dbPath;
 		ensureSuggestionTables(dbPath);
 
-		const esi = new EsiClient({
-			dbPath,
-			userAgent: config.userAgent,
-			failureThreshold: process.env['ESI_CIRCUIT_FAILURE_THRESHOLD']
-				? Number(process.env['ESI_CIRCUIT_FAILURE_THRESHOLD'])
-				: undefined,
-			halfOpenAfterMs: process.env['ESI_CIRCUIT_OPEN_AFTER_MS']
-				? Number(process.env['ESI_CIRCUIT_OPEN_AFTER_MS'])
-				: undefined,
-			minOpenDurationMs: process.env['ESI_CIRCUIT_MIN_OPEN_MS']
-				? Number(process.env['ESI_CIRCUIT_MIN_OPEN_MS'])
-				: undefined,
-			errorLimitOpenThreshold: process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD']
-				? Number(process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD'])
-				: undefined,
-		});
-		const { snapshots } = await fetchForgeJitaOrderSnapshots({ esi, maxPages });
+		// This legacy handler is retained for direct-fetch mode, but T-17 requires stored snapshots.
+		// For safety, we keep the old path behind an env toggle if needed in the future.
+		const directFetch = process.env['ALLOW_RUN_DIRECT_FETCH'] === '1';
+		if (directFetch) {
+			const esi = new EsiClient({
+				dbPath,
+				userAgent: config.userAgent,
+				failureThreshold: process.env['ESI_CIRCUIT_FAILURE_THRESHOLD']
+					? Number(process.env['ESI_CIRCUIT_FAILURE_THRESHOLD'])
+					: undefined,
+				halfOpenAfterMs: process.env['ESI_CIRCUIT_OPEN_AFTER_MS']
+					? Number(process.env['ESI_CIRCUIT_OPEN_AFTER_MS'])
+					: undefined,
+				minOpenDurationMs: process.env['ESI_CIRCUIT_MIN_OPEN_MS']
+					? Number(process.env['ESI_CIRCUIT_MIN_OPEN_MS'])
+					: undefined,
+				errorLimitOpenThreshold: process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD']
+					? Number(process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD'])
+					: undefined,
+			});
+			const { snapshots } = await fetchForgeJitaOrderSnapshots({ esi, maxPages });
+			const typeIds = Array.from(new Set(snapshots.map((s) => s.type_id)));
+			const riskByType = selectRiskMetricsByType({ dbPath, typeIds });
+			const { run, suggestions, usage } = await computeAnthropicBaselineSuggestions({
+				snapshots,
+				budget,
+				options,
+				riskByType,
+			});
+			persistSuggestionsToSqlite(dbPath, run, suggestions);
+			const esiMetrics = esi.getMetrics();
+			json(res, 200, {
+				run,
+				counts: { suggestions: suggestions.length },
+				usage,
+				esi: {
+					requests: esiMetrics.totalRequests,
+					cache_hits_304: esiMetrics.totalCacheHits304,
+					retries: esiMetrics.totalRetries,
+					error_limit_remain: esiMetrics.lastErrorLimitRemain,
+					error_limit_reset: esiMetrics.lastErrorLimitReset,
+					circuit_state: esiMetrics.circuit_state,
+					circuit_opened_reason: esiMetrics.circuit_opened_reason,
+				},
+			});
+			return;
+		}
 
+		// Stored snapshot path (default)
+		const state = (globalThis as any).__JITA_SNAPSHOT__ as
+			| {
+					snapshots: { type_id: number }[];
+					fetched_at: string;
+			  }
+			| null
+			| undefined;
+		if (!state || !state.snapshots?.length) {
+			// No snapshot yet; degrade gracefully with 503
+			const db = new DatabaseConstructor(dbPath);
+			try {
+				const latest = selectLatestRun(db);
+				json(res, 503, {
+					error: 'no_snapshot_available',
+					message:
+						'No market snapshot is available yet. Please try again after the next scheduled fetch completes.',
+					latest_run: latest,
+					market_snapshot_used: false,
+				});
+				return;
+			} finally {
+				db.close();
+			}
+		}
+		const snapshots = state.snapshots as any[];
+		const snapshotTs = state.fetched_at;
+		const ageMs = Date.now() - new Date(snapshotTs).getTime();
 		const typeIds = Array.from(new Set(snapshots.map((s) => s.type_id)));
 		const riskByType = selectRiskMetricsByType({ dbPath, typeIds });
 		const { run, suggestions, usage } = await computeAnthropicBaselineSuggestions({
-			snapshots,
+			snapshots: snapshots as any,
 			budget,
 			options,
 			riskByType,
 		});
 		persistSuggestionsToSqlite(dbPath, run, suggestions);
-		const esiMetrics = esi.getMetrics();
-		// Emit a concise metrics log for observability
-		// eslint-disable-next-line no-console
-		console.log(
-			JSON.stringify({
-				type: 'esi_metrics_summary',
-				requests: esiMetrics.totalRequests,
-				cache_hits_304: esiMetrics.totalCacheHits304,
-				retries: esiMetrics.totalRetries,
-				error_limit_remain: esiMetrics.lastErrorLimitRemain,
-				error_limit_reset: esiMetrics.lastErrorLimitReset,
-				last_status: esiMetrics.lastStatus,
-				last_url: esiMetrics.lastUrl,
-				circuit_state: esiMetrics.circuit_state,
-				circuit_opened_reason: esiMetrics.circuit_opened_reason,
-			}),
-		);
 		json(res, 200, {
 			run,
 			counts: { suggestions: suggestions.length },
 			usage,
-			esi: {
-				requests: esiMetrics.totalRequests,
-				cache_hits_304: esiMetrics.totalCacheHits304,
-				retries: esiMetrics.totalRetries,
-				error_limit_remain: esiMetrics.lastErrorLimitRemain,
-				error_limit_reset: esiMetrics.lastErrorLimitReset,
-				circuit_state: esiMetrics.circuit_state,
-				circuit_opened_reason: esiMetrics.circuit_opened_reason,
-			},
+			market_snapshot_used: true,
+			snapshot_age_ms: ageMs,
+			snapshot_timestamp: snapshotTs,
 		});
 	} catch (err) {
 		if (
@@ -317,6 +353,103 @@ export function createServer(config?: { dbPath?: string; userAgent?: string }): 
 		process.env['SQLITE_DB_PATH'] ??
 		path.resolve(__dirname, '..', 'dev.sqlite');
 	const userAgent = config?.userAgent ?? process.env['USER_AGENT'] ?? undefined;
+
+	// Market snapshot scheduler configuration
+	const snapshotIntervalMs = process.env['MARKET_SNAPSHOT_INTERVAL_MS']
+		? Number(process.env['MARKET_SNAPSHOT_INTERVAL_MS'])
+		: 300_000; // default 5 minutes
+	const snapshotStaleMs = process.env['MARKET_SNAPSHOT_STALE_MS']
+		? Number(process.env['MARKET_SNAPSHOT_STALE_MS'])
+		: 300_000; // default 5 minutes
+
+	type JitaSnapshotRecord = {
+		snapshots: MarketOrderSnapshot[];
+		last_modified: string | null;
+		fetched_at: string; // ISO timestamp when scheduler fetched
+	};
+
+	let latestSnapshot: JitaSnapshotRecord | null = null;
+
+	async function fetchAndStoreSnapshots(): Promise<void> {
+		const startedAt = Date.now();
+		// eslint-disable-next-line no-console
+		console.log(JSON.stringify({ type: 'market_snapshot_fetch_start', started_at: startedAt }));
+		const esi = new EsiClient({
+			dbPath,
+			userAgent,
+			failureThreshold: process.env['ESI_CIRCUIT_FAILURE_THRESHOLD']
+				? Number(process.env['ESI_CIRCUIT_FAILURE_THRESHOLD'])
+				: undefined,
+			halfOpenAfterMs: process.env['ESI_CIRCUIT_OPEN_AFTER_MS']
+				? Number(process.env['ESI_CIRCUIT_OPEN_AFTER_MS'])
+				: undefined,
+			minOpenDurationMs: process.env['ESI_CIRCUIT_MIN_OPEN_MS']
+				? Number(process.env['ESI_CIRCUIT_MIN_OPEN_MS'])
+				: undefined,
+			errorLimitOpenThreshold: process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD']
+				? Number(process.env['ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD'])
+				: undefined,
+		});
+		try {
+			const { snapshots, lastModified } = await fetchForgeJitaOrderSnapshots({ esi });
+			latestSnapshot = {
+				snapshots,
+				last_modified: lastModified,
+				fetched_at: new Date().toISOString(),
+			};
+			// Expose globally so request handlers can access without refactor
+			(globalThis as any).__JITA_SNAPSHOT__ = latestSnapshot;
+			const durationMs = Date.now() - startedAt;
+			const m = esi.getMetrics();
+			// eslint-disable-next-line no-console
+			console.log(
+				JSON.stringify({
+					type: 'market_snapshot_fetch_success',
+					duration_ms: durationMs,
+					snapshot_items: snapshots.length,
+					last_modified: lastModified,
+					esi_requests: m.totalRequests,
+					esi_cache_hits_304: m.totalCacheHits304,
+					esi_retries: m.totalRetries,
+					error_limit_remain: m.lastErrorLimitRemain,
+					error_limit_reset: m.lastErrorLimitReset,
+				}),
+			);
+		} catch (err) {
+			const durationMs = Date.now() - startedAt;
+			// eslint-disable-next-line no-console
+			console.log(
+				JSON.stringify({
+					type: 'market_snapshot_fetch_failure',
+					duration_ms: durationMs,
+					error: String((err as Error)?.message ?? err),
+				}),
+			);
+		}
+	}
+
+	// Start scheduler (non-blocking) with immediate fetch on boot
+	try {
+		// eslint-disable-next-line no-console
+		console.log(
+			JSON.stringify({
+				type: 'market_snapshot_scheduler_start',
+				interval_ms: snapshotIntervalMs,
+				stale_ms: snapshotStaleMs,
+			}),
+		);
+		// Fire and forget initial fetch
+		// Avoid blocking server start
+		void fetchAndStoreSnapshots();
+		setInterval(
+			() => {
+				void fetchAndStoreSnapshots();
+			},
+			Math.max(15_000, snapshotIntervalMs),
+		); // guard against overly aggressive settings
+	} catch {
+		// ignore scheduler errors at startup
+	}
 
 	// Static file roots
 	const frontendPublicDir = path.resolve(__dirname, '..', '..', 'frontend', 'public');

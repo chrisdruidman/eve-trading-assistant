@@ -116,9 +116,9 @@ sequenceDiagram
   participant LLM as Anthropic
 
   UI->>API: Request suggestions (budget, constraints)
-  API->>ESI: Fetch market data (with caching and user agent)
-  ESI-->>API: Data + headers (ETag, expires, last-modified)
-  API->>DB: Upsert snapshots and cache entries
+  API->>Sched: Use latest stored Jita market snapshot (scheduler fetches every 5m)
+  Note over Sched,API: No ESI calls in the run path
+  API->>DB: Upsert suggestions and run metadata
   API->>AG: Invoke strategy with normalized snapshot_id
   AG->>DB: Read snapshot, aggregate features
   AG->>LLM: Prompt with features and constraints (request JSON-only)

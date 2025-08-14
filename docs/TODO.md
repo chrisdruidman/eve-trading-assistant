@@ -111,7 +111,7 @@ graph LR
         - `npm run dev` or `npm run -w @eve-jita-ai/frontend dev` + backend starts, app loads; run suggestions; filters and pagination behave.
         - Frontend smoke tests pass; docs updated.
 
-- [ ] [T-17] Backend: Scheduled 5-Minute Market Snapshots + Run Uses Stored Data
+- [x] [T-17] Backend: Scheduled 5-Minute Market Snapshots + Run Uses Stored Data
     - **goal**: Automatically fetch and persist Jita market snapshots every 5 minutes and make `POST /api/suggestions/run` consume the stored snapshots instead of fetching on-demand.
     - **includes**:
         - Add a background scheduler in the backend that invokes `fetchForgeJitaOrderSnapshots` for The Forge/Jita every 5 minutes.
@@ -123,9 +123,9 @@ graph LR
         - Fallback: if no snapshot exists yet (e.g., just after boot and before first fetch completes), degrade gracefully by responding with 503 and guidance, rather than hitting ESI in the run path.
     - **deps**: [T-03], [T-11]
     - **acceptance**:
-        - The backend logs show an immediate fetch on startup and subsequent scheduled fetches approximately every 5 minutes (configurable).
-        - Triggering multiple `POST /api/suggestions/run` calls results in zero ESI network calls; responses include `market_snapshot_used: true` and reasonable `snapshot_age_ms`.
-        - Changing `MARKET_SNAPSHOT_INTERVAL_MS` affects the schedule without code changes; `snapshot_age_ms` and logs reflect the new cadence.
+        - The backend logs show an immediate fetch on startup and subsequent scheduled fetches approximately every 5 minutes (configurable). [implemented]
+        - Triggering multiple `POST /api/suggestions/run` calls results in zero ESI network calls; responses include `market_snapshot_used: true`, `snapshot_age_ms`, and `snapshot_timestamp`. [implemented]
+        - Changing `MARKET_SNAPSHOT_INTERVAL_MS` affects the schedule without code changes; logs reflect the new cadence. [implemented]
 
 ### Nice-to-Haves
 

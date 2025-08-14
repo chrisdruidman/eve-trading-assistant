@@ -73,7 +73,7 @@ graph TD
 
 Key points:
 
-- The backend is the sole component that speaks to ESI. It injects the correct user agent headers, handles caching via `ETag`/`If-None-Match`, respects `expires`/`last-modified`, and implements error-limit backoff. See: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/).
+- The backend is the sole component that speaks to ESI. It injects the correct user agent headers, handles caching via `ETag`/`If-None-Match`, respects `expires`/`last-modified`, and implements error-limit backoff. See: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/). It now schedules market snapshots for Jita every 5 minutes and serves runs from the latest stored snapshot.
 - The agent consumes normalized market snapshots from SQLite and emits suggested orders with clear justifications and risk flags.
 - The frontend provides exploration and decision support; it does not place orders.
 
@@ -185,6 +185,9 @@ Only commit `.env.example`. The `.env` file is ignored by git.
 - `ESI_CIRCUIT_OPEN_AFTER_MS` (optional): cooldown before half-open probes (default 60000).
 - `ESI_CIRCUIT_MIN_OPEN_MS` (optional): minimum open duration (default 30000).
 - `ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD` (optional): open when `X-ESI-Error-Limit-Remain` <= value (default 2).
+- `MARKET_SNAPSHOT_INTERVAL_MS` (optional): scheduler interval for background snapshot fetches (default 300000).
+- `MARKET_SNAPSHOT_STALE_MS` (optional): considered stale age for snapshots (default 300000). Currently used for telemetry and logs.
+- `ALLOW_RUN_DIRECT_FETCH` (optional): set to `1` to allow `POST /api/suggestions/run` to fetch ESI directly (bypassing the stored snapshot). Default disabled.
 
 Price history loading (programmatic usage):
 
@@ -199,10 +202,10 @@ upsertPriceHistoryRows({ dbPath, regionId: 10000002, typeId: 34, rows });
 
 API Endpoints:
 
-- `POST /api/suggestions/run` — body: `{ "budget": number, "options"?: {...}, "maxPages"?: number }`
-    - Runs a pass: ingests market snapshots for Jita, computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage, esi }`.
-    - `esi` contains telemetry for the ESI client during the run: `{ requests, cache_hits_304, retries, error_limit_remain, error_limit_reset, circuit_state, circuit_opened_reason }`.
-    - If the ESI circuit is open, the API responds with `503` and `{ error: 'circuit_open', message, latest_run, esi }`.
+- `POST /api/suggestions/run` — body: `{ "budget": number, "options"?: {...} }`
+    - Runs a pass using the latest stored market snapshot (no ESI calls during the request), computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage, market_snapshot_used, snapshot_age_ms, snapshot_timestamp }`.
+    - If no snapshot is available yet (e.g., just after boot), responds with `503` and `{ error: 'no_snapshot_available', message, latest_run, market_snapshot_used: false }`.
+    - For debugging or legacy behavior, you can temporarily enable direct-fetch mode by setting `ALLOW_RUN_DIRECT_FETCH=1` (not recommended in normal operation).
 - `GET /api/suggestions?run_id=...&page=1&limit=50` — lists suggestions for a run (or the latest run when `run_id` is omitted), with pagination metadata.
 
 Frontend build:
