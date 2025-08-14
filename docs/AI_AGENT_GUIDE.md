@@ -56,7 +56,7 @@ Follow these rules for every outgoing request to ESI:
     - For pagination, ensure `last-modified` is stable across pages; refetch if not.
 - Retries and resilience:
     - Retry transient errors (network, 5xx, 429) with exponential backoff and jitter.
-    - Use a circuit-breaker to avoid hammering ESI during incident windows.
+    - Use a circuit-breaker to avoid hammering ESI during incident windows. The backend `EsiClient` implements a breaker with configurable thresholds, half-open probing, and preemptive open when `X-ESI-Error-Limit-Remain` is critically low. The server degrades gracefully by returning 503 with the latest available run.
     - Persist partial results only with a clear `snapshot_id` and consistency checks.
 
 ### ESI Endpoints (Initial Focus)

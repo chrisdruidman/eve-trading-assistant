@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
 
-import { EsiClient } from './esiClient';
+import { EsiClient, CircuitOpenError } from './esiClient';
 import { fetchForgeJitaOrderSnapshots } from './marketIngestion';
 import { selectRiskMetricsByType } from './priceHistory';
 import { runSqliteMigrations } from './db/migrate';
@@ -88,7 +88,22 @@ async function handleRunSuggestion(
 		const dbPath = config.dbPath;
 		ensureSuggestionTables(dbPath);
 
-		const esi = new EsiClient({ dbPath, userAgent: config.userAgent });
+		const esi = new EsiClient({
+			dbPath,
+			userAgent: config.userAgent,
+			failureThreshold: process.env.ESI_CIRCUIT_FAILURE_THRESHOLD
+				? Number(process.env.ESI_CIRCUIT_FAILURE_THRESHOLD)
+				: undefined,
+			halfOpenAfterMs: process.env.ESI_CIRCUIT_OPEN_AFTER_MS
+				? Number(process.env.ESI_CIRCUIT_OPEN_AFTER_MS)
+				: undefined,
+			minOpenDurationMs: process.env.ESI_CIRCUIT_MIN_OPEN_MS
+				? Number(process.env.ESI_CIRCUIT_MIN_OPEN_MS)
+				: undefined,
+			errorLimitOpenThreshold: process.env.ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD
+				? Number(process.env.ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD)
+				: undefined,
+		});
 		const { snapshots } = await fetchForgeJitaOrderSnapshots({ esi, maxPages });
 
 		const typeIds = Array.from(new Set(snapshots.map((s) => s.type_id)));
@@ -113,6 +128,8 @@ async function handleRunSuggestion(
 				error_limit_reset: esiMetrics.lastErrorLimitReset,
 				last_status: esiMetrics.lastStatus,
 				last_url: esiMetrics.lastUrl,
+				circuit_state: (esiMetrics as any).circuit_state,
+				circuit_opened_reason: (esiMetrics as any).circuit_opened_reason,
 			}),
 		);
 		json(res, 200, {
@@ -125,9 +142,27 @@ async function handleRunSuggestion(
 				retries: esiMetrics.totalRetries,
 				error_limit_remain: esiMetrics.lastErrorLimitRemain,
 				error_limit_reset: esiMetrics.lastErrorLimitReset,
+				circuit_state: (esiMetrics as any).circuit_state,
+				circuit_opened_reason: (esiMetrics as any).circuit_opened_reason,
 			},
 		});
 	} catch (err: any) {
+		if (err instanceof CircuitOpenError || err?.name === 'CircuitOpenError') {
+			// Graceful degradation: return latest run metadata when circuit is open
+			const db = new DatabaseConstructor(config.dbPath);
+			try {
+				const latest = selectLatestRun(db);
+				json(res, 503, {
+					error: 'circuit_open',
+					message: String(err.message ?? 'ESI circuit open'),
+					latest_run: latest,
+					esi: err?.esi_metrics ?? null,
+				});
+				return;
+			} finally {
+				db.close();
+			}
+		}
 		json(res, 500, { error: 'internal_error', message: String(err?.message ?? err) });
 	}
 }

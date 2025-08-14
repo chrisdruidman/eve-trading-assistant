@@ -17,6 +17,7 @@ The app will leverage EVE's ESI API with strict adherence to best practices, inc
 - Agent risk/volatility features: compute 30d coefficient of variation and average volume from `price_history_daily`; filter and enrich features for the LLM. Backend exposes `selectRiskMetricsByType` and server passes `riskByType` to the agent. New agent options: `maxCv30d`, `minAvgVolume30d`. [T-09] complete.
 - Agent budget and position sizing: greedy allocation with per-type budget caps and diversification; respects total budget and caps during suggestion finalization. [T-10] complete.
     - Ops error-limit telemetry and backoff controls: structured logs for ESI backoff and per-run metrics surfaced in API response. [T-11] complete.
+    - Ops circuit breaker and recovery: circuit state/telemetry in `EsiClient`; graceful 503 with latest run when upstream is degraded. [T-12] complete.
 
 ## Scope and Principles
 
@@ -167,6 +168,10 @@ Environment variables:
 - `SQLITE_DB_PATH`: path to the SQLite DB file (defaults to `packages/backend/dev.sqlite`).
 - `USER_AGENT`: optional override for the ESI User-Agent header.
 - `ANTHROPIC_API_KEY`: required to use the Anthropic-backed agent.
+- `ESI_CIRCUIT_FAILURE_THRESHOLD` (optional): failures to trigger open (default 5).
+- `ESI_CIRCUIT_OPEN_AFTER_MS` (optional): cooldown before half-open probes (default 60000).
+- `ESI_CIRCUIT_MIN_OPEN_MS` (optional): minimum open duration (default 30000).
+- `ESI_CIRCUIT_ERROR_LIMIT_THRESHOLD` (optional): open when `X-ESI-Error-Limit-Remain` <= value (default 2).
 
 Price history loading (programmatic usage):
 
@@ -183,7 +188,8 @@ API Endpoints:
 
 - `POST /api/suggestions/run` — body: `{ "budget": number, "options"?: {...}, "maxPages"?: number }`
     - Runs a pass: ingests market snapshots for Jita, computes suggestions with the Anthropic baseline, persists to SQLite, and returns `{ run, counts, usage, esi }`.
-    - `esi` contains telemetry for the ESI client during the run: `{ requests, cache_hits_304, retries, error_limit_remain, error_limit_reset }`.
+    - `esi` contains telemetry for the ESI client during the run: `{ requests, cache_hits_304, retries, error_limit_remain, error_limit_reset, circuit_state, circuit_opened_reason }`.
+    - If the ESI circuit is open, the API responds with `503` and `{ error: 'circuit_open', message, latest_run, esi }`.
 - `GET /api/suggestions?run_id=...&page=1&limit=50` — lists suggestions for a run (or the latest run when `run_id` is omitted), with pagination metadata.
 
 Frontend:

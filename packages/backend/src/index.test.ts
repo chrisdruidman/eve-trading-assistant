@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { helloBackend } from './index';
-import { EsiClient } from './esiClient';
+import { EsiClient, CircuitOpenError } from './esiClient';
 import { runSqliteMigrations } from './db/migrate';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,5 +71,31 @@ describe('backend smoke', () => {
 			migrationsDir,
 		});
 		expect(result2.applied.length).toBe(0);
+	});
+
+	it('opens circuit on repeated 5xx/429 and degrades gracefully', async () => {
+		const client = new EsiClient({
+			dbPath: ':memory:',
+			failureThreshold: 2,
+			maxRetries: 0,
+			minOpenDurationMs: 10,
+		});
+		const fetchMock = vi.spyOn(globalThis, 'fetch');
+		fetchMock.mockResolvedValueOnce(
+			new Response('server error', { status: 500 }) as unknown as Response,
+		);
+		await expect(client.fetchJson('https://example.com/unstable')).rejects.toBeInstanceOf(
+			Error,
+		);
+		fetchMock.mockResolvedValueOnce(
+			new Response('server error', { status: 500 }) as unknown as Response,
+		);
+		await expect(client.fetchJson('https://example.com/unstable')).rejects.toBeInstanceOf(
+			Error,
+		);
+		// Now circuit should be open and reject immediately with CircuitOpenError
+		await expect(client.fetchJson('https://example.com/unstable')).rejects.toBeInstanceOf(
+			CircuitOpenError,
+		);
 	});
 });

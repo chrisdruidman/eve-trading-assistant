@@ -42,6 +42,17 @@ export class EsiClient implements EsiHttp {
 	private readonly backoffCapMs: number;
 	private readonly maxRetries: number;
 
+	// Circuit breaker fields
+	private readonly failureThreshold: number;
+	private readonly halfOpenAfterMs: number;
+	private readonly errorLimitOpenThreshold: number;
+	private readonly minOpenDurationMs: number;
+
+	private circuitState: 'closed' | 'open' | 'half_open' = 'closed';
+	private consecutiveFailures = 0;
+	private openedAtMs: number | null = null;
+	private openedReason: string | null = null;
+
 	private metrics = {
 		totalRequests: 0,
 		totalCacheHits304: 0,
@@ -58,12 +69,20 @@ export class EsiClient implements EsiHttp {
 		backoffBaseMs?: number;
 		backoffCapMs?: number;
 		maxRetries?: number;
+		failureThreshold?: number;
+		halfOpenAfterMs?: number;
+		errorLimitOpenThreshold?: number;
+		minOpenDurationMs?: number;
 	}) {
 		this.cache = new SqliteCache(params.dbPath);
 		this.userAgent = params.userAgent ?? DEFAULT_USER_AGENT;
 		this.backoffBaseMs = params.backoffBaseMs ?? 250;
 		this.backoffCapMs = params.backoffCapMs ?? 30_000;
 		this.maxRetries = params.maxRetries ?? 6;
+		this.failureThreshold = params.failureThreshold ?? 5;
+		this.halfOpenAfterMs = params.halfOpenAfterMs ?? 60_000; // 1m
+		this.errorLimitOpenThreshold = params.errorLimitOpenThreshold ?? 2; // remain <= 2 -> open
+		this.minOpenDurationMs = params.minOpenDurationMs ?? 30_000; // stay open at least 30s
 	}
 
 	getMetrics(): Readonly<{
@@ -74,14 +93,70 @@ export class EsiClient implements EsiHttp {
 		lastErrorLimitReset: number | null;
 		lastStatus: number | null;
 		lastUrl: string | null;
+		circuit_state?: 'closed' | 'open' | 'half_open';
+		circuit_failures?: number;
+		circuit_opened_at?: number | null;
+		circuit_opened_reason?: string | null;
 	}> {
-		return this.metrics;
+		return {
+			...this.metrics,
+			circuit_state: this.circuitState,
+			circuit_failures: this.consecutiveFailures,
+			circuit_opened_at: this.openedAtMs,
+			circuit_opened_reason: this.openedReason,
+		};
+	}
+
+	private transitionCircuit(state: 'closed' | 'open' | 'half_open', reason: string): void {
+		if (this.circuitState === state) return;
+		this.circuitState = state;
+		if (state === 'open') {
+			this.openedAtMs = Date.now();
+			this.openedReason = reason;
+		} else if (state === 'closed') {
+			this.openedAtMs = null;
+			this.openedReason = null;
+		}
+		// eslint-disable-next-line no-console
+		console.log(
+			JSON.stringify({
+				type: 'esi_circuit_update',
+				state,
+				reason,
+				failures: this.consecutiveFailures,
+				opened_at: this.openedAtMs,
+			}),
+		);
+	}
+
+	private isCircuitOpen(): boolean {
+		if (this.circuitState === 'open') {
+			const now = Date.now();
+			const openedAt = this.openedAtMs ?? now;
+			// Remain open at least minOpenDurationMs, then allow half-open probes
+			if (now - openedAt < this.minOpenDurationMs) {
+				return true;
+			}
+			if (now - openedAt >= this.halfOpenAfterMs) {
+				this.transitionCircuit('half_open', 'cooldown_elapsed');
+				return false; // allow a probe
+			}
+			return true;
+		}
+		return false;
 	}
 
 	async fetchJson(
 		url: string,
 		options?: { method?: 'GET'; query?: Record<string, string | number | boolean> },
 	): Promise<FetchResult> {
+		if (this.isCircuitOpen()) {
+			const err = new CircuitOpenError(
+				`ESI circuit is open (reason=${this.openedReason ?? 'unknown'})`,
+			);
+			(err as any).esi_metrics = this.getMetrics();
+			throw err;
+		}
 		const method = options?.method ?? 'GET';
 		const query = options?.query;
 		const cacheKey = createCacheKey(url, query);
@@ -139,11 +214,16 @@ export class EsiClient implements EsiHttp {
 					this.metrics.totalRequests += 1;
 					this.metrics.lastStatus = response.status;
 					this.metrics.lastUrl = fullUrl;
+					this.consecutiveFailures += 1;
+					if (this.consecutiveFailures >= this.failureThreshold) {
+						this.transitionCircuit('open', `failures_ge_${this.failureThreshold}`);
+					}
 					break;
 				}
 				const delay = computeBackoffDelayMs(attempt, this.backoffBaseMs, this.backoffCapMs);
 				attempt += 1;
 				this.metrics.totalRetries += 1;
+				this.consecutiveFailures += 1;
 				// eslint-disable-next-line no-console
 				console.log(
 					JSON.stringify({
@@ -158,6 +238,17 @@ export class EsiClient implements EsiHttp {
 				);
 				await sleep(delay);
 				continue;
+			}
+
+			// Preemptive open when error-limit is critically low
+			if (
+				this.metrics.lastErrorLimitRemain !== null &&
+				this.metrics.lastErrorLimitRemain <= this.errorLimitOpenThreshold
+			) {
+				this.transitionCircuit(
+					'open',
+					`error_limit_remain_le_${this.errorLimitOpenThreshold}`,
+				);
 			}
 
 			const text = await response.text();
@@ -195,6 +286,11 @@ export class EsiClient implements EsiHttp {
 				);
 			}
 
+			// Success path resets circuit (including 304 cache hit which jumps earlier)
+			this.consecutiveFailures = 0;
+			if (this.circuitState === 'half_open' || this.circuitState === 'open') {
+				this.transitionCircuit('closed', 'successful_probe');
+			}
 			return {
 				status: response.status,
 				headers: headersRecord,
@@ -202,5 +298,9 @@ export class EsiClient implements EsiHttp {
 				fromCache: false,
 			};
 		}
+		// If we exit the loop without returning, signal failure
+		throw new Error('ESI request failed after max retries or circuit open');
 	}
 }
+
+export class CircuitOpenError extends Error {}

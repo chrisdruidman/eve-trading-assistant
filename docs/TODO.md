@@ -86,8 +86,12 @@ graph LR
     - **deps**: [T-02]
     - **refs**: [ESI Best Practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 
-- [ ] [T-12] Ops: Circuit Breaker + Recovery
+- [x] [T-12] Ops: Circuit Breaker + Recovery
     - **goal**: Prevent cascading failures during upstream incidents and provide graceful degradation to cached data.
+    - **includes**:
+        - Circuit breaker added to `EsiClient` with configurable thresholds, half-open probing, and telemetry logs (`esi_circuit_update`).
+        - Preemptive open when `X-ESI-Error-Limit-Remain` falls below threshold.
+        - Server gracefully degrades `POST /api/suggestions/run` with 503, including latest run metadata and ESI metrics when circuit is open.
     - **deps**: [T-11]
 
 ### Nice-to-Haves
