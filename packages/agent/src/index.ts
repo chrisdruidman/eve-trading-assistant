@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import DatabaseConstructor from 'better-sqlite3';
 import { z } from 'zod';
 
@@ -34,12 +34,10 @@ type AggregatedTypeFeatures = {
 };
 
 function generateUuid(): string {
-	if ('randomUUID' in crypto) {
-		// @ts-expect-error Node typings expose randomUUID on crypto
-		return crypto.randomUUID();
+	if (typeof randomUUID === 'function') {
+		return randomUUID();
 	}
-	return crypto
-		.createHash('sha256')
+	return createHash('sha256')
 		.update(String(Math.random()) + Date.now())
 		.digest('hex');
 }
@@ -254,11 +252,11 @@ export async function computeAnthropicBaselineSuggestions(
 	const maxCv30d = options.maxCv30d ?? 1.0;
 	const minAvgVolume30d = options.minAvgVolume30d ?? 1000;
 
-	const model = options.model ?? process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514';
+	const model = options.model ?? process.env['ANTHROPIC_MODEL'] ?? 'claude-sonnet-4-20250514';
 	const temperature = options.temperature ?? 0.1;
 	const maxTokens = options.maxTokens ?? 1500;
 
-	const apiKey = process.env.ANTHROPIC_API_KEY;
+	const apiKey = process.env['ANTHROPIC_API_KEY'];
 	if (!apiKey && !options.anthropicClient) {
 		throw new Error('ANTHROPIC_API_KEY is required');
 	}
