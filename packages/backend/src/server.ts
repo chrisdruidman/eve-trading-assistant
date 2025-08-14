@@ -217,6 +217,8 @@ async function handleListSuggestions(
 	config: { dbPath: string },
 ): Promise<void> {
 	try {
+		// Ensure tables exist so first GET before any POST run doesn't 500
+		ensureSuggestionTables(config.dbPath);
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		const pageNum = Number(url.searchParams.get('page') ?? '1');
 		const limitNum = Number(url.searchParams.get('limit') ?? '50');
@@ -313,7 +315,7 @@ export function createServer(config?: { dbPath?: string; userAgent?: string }): 
 	const dbPath =
 		config?.dbPath ??
 		process.env['SQLITE_DB_PATH'] ??
-		path.resolve('packages/backend/dev.sqlite');
+		path.resolve(__dirname, '..', 'dev.sqlite');
 	const userAgent = config?.userAgent ?? process.env['USER_AGENT'] ?? undefined;
 
 	// Static file roots
@@ -412,7 +414,12 @@ export function startServer(config?: {
 	return server;
 }
 
-// Allow running directly with tsx/node
-if (import.meta.url === `file://${__filename}`) {
-	startServer();
+// Allow running directly with tsx/node (cross-platform)
+try {
+	const entry = process.argv[1] ? path.resolve(process.argv[1]) : '';
+	if (entry && entry === path.resolve(__filename)) {
+		startServer();
+	}
+} catch {
+	// ignore
 }
